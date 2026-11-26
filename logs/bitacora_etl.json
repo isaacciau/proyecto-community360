@@ -1,0 +1,44 @@
+{
+  "fecha": "2026-11-25T20:03:01.584Z",
+  "usuarios": {
+    "recibidos": 1068,
+    "aceptados": 1068,
+    "transformados": 275,
+    "rechazados": 0,
+    "observaciones": "duplicados: 0; inválidos: 0; sin consentimiento depurados: 171",
+    "detalle": {
+      "recibidos": 1068,
+      "duplicados_id": 0,
+      "duplicados_alias": 0,
+      "nulos_normalizados": {
+        "latitud": 275,
+        "longitud": 275
+      },
+      "fechas_estandarizadas": 1068
+    },
+    "privacidad": {
+      "usuarios_sin_consentimiento": 171,
+      "valores_geograficos_borrados": 684
+    }
+  },
+  "interacciones": {
+    "recibidos": 1000,
+    "aceptados": 207,
+    "transformados": 478,
+    "rechazados": 793,
+    "observaciones": "duplicados: 0; huérfanas: 793; inválidas: 0; antes del ingreso: 4",
+    "detalle": {
+      "recibidos": 1000,
+      "duplicados_id": 0,
+      "nulos_normalizados": {
+        "etiquetas": 231,
+        "texto": 144,
+        "pais": 173,
+        "estado": 173,
+        "ciudad": 173
+      },
+      "timestamps_estandarizados": 1000,
+      "longitud_recalculada": 144
+    }
+  }
+}

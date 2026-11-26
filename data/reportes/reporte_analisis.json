@@ -1,0 +1,422 @@
+{
+  "fecha": "2026-11-25T14:23:46.193Z",
+  "consultas": {
+    "Q1": {
+      "titulo": "Distribución de usuarios por estatus",
+      "sql": "SELECT estatus,\n                       COUNT(*)                                     AS total,\n                       ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS pct\n                FROM usuarios\n                GROUP BY estatus\n                ORDER BY total DESC",
+      "filas": [
+        {
+          "estatus": "en_riesgo",
+          "total": 421,
+          "pct": "39.42"
+        },
+        {
+          "estatus": "activo",
+          "total": 390,
+          "pct": "36.52"
+        },
+        {
+          "estatus": "inactivo",
+          "total": 257,
+          "pct": "24.06"
+        }
+      ]
+    },
+    "Q2": {
+      "titulo": "Interacciones por canal (volumen y sentimiento promedio)",
+      "sql": "SELECT canal,\n                       COUNT(*)                       AS total_interacciones,\n                       ROUND(AVG(sentimiento), 3)     AS sentimiento_promedio,\n                       ROUND(AVG(reacciones_recibidas), 2) AS reacciones_promedio\n                FROM interacciones\n                GROUP BY canal\n                ORDER BY total_interacciones DESC",
+      "filas": [
+        {
+          "canal": "Telegram",
+          "total_interacciones": 70,
+          "sentimiento_promedio": "0.281",
+          "reacciones_promedio": "2.59"
+        },
+        {
+          "canal": "Facebook",
+          "total_interacciones": 51,
+          "sentimiento_promedio": "0.311",
+          "reacciones_promedio": "2.55"
+        },
+        {
+          "canal": "Instagram",
+          "total_interacciones": 28,
+          "sentimiento_promedio": "0.155",
+          "reacciones_promedio": "2.89"
+        },
+        {
+          "canal": "TikTok",
+          "total_interacciones": 24,
+          "sentimiento_promedio": "0.291",
+          "reacciones_promedio": "3.29"
+        },
+        {
+          "canal": "Twitter/X",
+          "total_interacciones": 19,
+          "sentimiento_promedio": "0.525",
+          "reacciones_promedio": "2.79"
+        },
+        {
+          "canal": "Discord",
+          "total_interacciones": 15,
+          "sentimiento_promedio": "0.337",
+          "reacciones_promedio": "1.67"
+        }
+      ]
+    },
+    "Q3": {
+      "titulo": "Top 10 usuarios más activos (interacciones en BD)",
+      "sql": "SELECT u.id_usuario, u.alias, u.estatus,\n                       COUNT(i.id_interaccion)   AS total_interacciones,\n                       ROUND(AVG(i.sentimiento),3) AS sentimiento_promedio\n                FROM usuarios u\n                JOIN interacciones i USING(id_usuario)\n                GROUP BY u.id_usuario, u.alias, u.estatus\n                ORDER BY total_interacciones DESC\n                LIMIT 10",
+      "filas": [
+        {
+          "id_usuario": "U000002",
+          "alias": "YukiInk45",
+          "estatus": "activo",
+          "total_interacciones": 16,
+          "sentimiento_promedio": "0.445"
+        },
+        {
+          "id_usuario": "U000483",
+          "alias": "KibaMoon44",
+          "estatus": "en_riesgo",
+          "total_interacciones": 8,
+          "sentimiento_promedio": "0.018"
+        },
+        {
+          "id_usuario": "U001057",
+          "alias": "FlareArt63",
+          "estatus": "activo",
+          "total_interacciones": 6,
+          "sentimiento_promedio": "0.345"
+        },
+        {
+          "id_usuario": "U000924",
+          "alias": "ÁmbarFang30",
+          "estatus": "activo",
+          "total_interacciones": 5,
+          "sentimiento_promedio": "-0.212"
+        },
+        {
+          "id_usuario": "U000495",
+          "alias": "SolCh'a75",
+          "estatus": "activo",
+          "total_interacciones": 4,
+          "sentimiento_promedio": "0.853"
+        },
+        {
+          "id_usuario": "U000169",
+          "alias": "MikaFang21",
+          "estatus": "en_riesgo",
+          "total_interacciones": 4,
+          "sentimiento_promedio": "-0.293"
+        },
+        {
+          "id_usuario": "U000849",
+          "alias": "YukiInk62",
+          "estatus": "activo",
+          "total_interacciones": 4,
+          "sentimiento_promedio": "0.393"
+        },
+        {
+          "id_usuario": "U000917",
+          "alias": "RuneCh'a31",
+          "estatus": "en_riesgo",
+          "total_interacciones": 3,
+          "sentimiento_promedio": "-0.070"
+        },
+        {
+          "id_usuario": "U000865",
+          "alias": "SombraCh'a96",
+          "estatus": "en_riesgo",
+          "total_interacciones": 3,
+          "sentimiento_promedio": "0.120"
+        },
+        {
+          "id_usuario": "U000257",
+          "alias": "ZetaByte92",
+          "estatus": "activo",
+          "total_interacciones": 3,
+          "sentimiento_promedio": "0.510"
+        }
+      ]
+    },
+    "Q4": {
+      "titulo": "Distribución de interacciones por tipo",
+      "sql": "SELECT tipo,\n                       COUNT(*)                                           AS total,\n                       ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS pct,\n                       ROUND(AVG(sentimiento), 3)                         AS sentimiento_promedio\n                FROM interacciones\n                GROUP BY tipo\n                ORDER BY total DESC",
+      "filas": [
+        {
+          "tipo": "mensaje",
+          "total": 90,
+          "pct": "43.48",
+          "sentimiento_promedio": "0.289"
+        },
+        {
+          "tipo": "comentario",
+          "total": 56,
+          "pct": "27.05",
+          "sentimiento_promedio": "0.267"
+        },
+        {
+          "tipo": "reaccion",
+          "total": 33,
+          "pct": "15.94",
+          "sentimiento_promedio": "0.322"
+        },
+        {
+          "tipo": "respuesta_encuesta",
+          "total": 22,
+          "pct": "10.63",
+          "sentimiento_promedio": "0.313"
+        },
+        {
+          "tipo": "rsvp_evento",
+          "total": 6,
+          "pct": "2.90",
+          "sentimiento_promedio": "0.572"
+        }
+      ]
+    },
+    "Q5": {
+      "titulo": "Top 10 temas por número de interacciones",
+      "sql": "SELECT tema,\n                       COUNT(*)                       AS total,\n                       ROUND(AVG(sentimiento), 3)     AS sentimiento_promedio,\n                       SUM(reacciones_recibidas)      AS total_reacciones\n                FROM interacciones\n                WHERE tema IS NOT NULL\n                GROUP BY tema\n                ORDER BY total DESC\n                LIMIT 10",
+      "filas": [
+        {
+          "tema": "arte_comisiones",
+          "total": 48,
+          "sentimiento_promedio": "0.242",
+          "total_reacciones": "146"
+        },
+        {
+          "tema": "reglas_moderacion",
+          "total": 37,
+          "sentimiento_promedio": "0.292",
+          "total_reacciones": "79"
+        },
+        {
+          "tema": "videojuegos",
+          "total": 31,
+          "sentimiento_promedio": "0.174",
+          "total_reacciones": "63"
+        },
+        {
+          "tema": "eventos_convenciones",
+          "total": 30,
+          "sentimiento_promedio": "0.352",
+          "total_reacciones": "73"
+        },
+        {
+          "tema": "seguridad_privacidad",
+          "total": 19,
+          "sentimiento_promedio": "0.483",
+          "total_reacciones": "55"
+        },
+        {
+          "tema": "fursuits",
+          "total": 15,
+          "sentimiento_promedio": "0.238",
+          "total_reacciones": "69"
+        },
+        {
+          "tema": "musica",
+          "total": 14,
+          "sentimiento_promedio": "0.564",
+          "total_reacciones": "38"
+        },
+        {
+          "tema": "memes_humor",
+          "total": 13,
+          "sentimiento_promedio": "0.221",
+          "total_reacciones": "26"
+        }
+      ]
+    },
+    "Q6": {
+      "titulo": "Sentimiento promedio e interacciones por rango de edad",
+      "sql": "SELECT u.rango_edad,\n                       COUNT(DISTINCT u.id_usuario)       AS total_usuarios,\n                       COUNT(i.id_interaccion)            AS total_interacciones,\n                       ROUND(AVG(u.sentimiento_promedio), 3) AS sent_usuarios,\n                       ROUND(AVG(i.sentimiento), 3)       AS sent_interacciones\n                FROM usuarios u\n                LEFT JOIN interacciones i USING(id_usuario)\n                GROUP BY u.rango_edad\n                ORDER BY u.rango_edad",
+      "filas": [
+        {
+          "rango_edad": "18-24",
+          "total_usuarios": 534,
+          "total_interacciones": 90,
+          "sent_usuarios": "0.258",
+          "sent_interacciones": "0.318"
+        },
+        {
+          "rango_edad": "25-31",
+          "total_usuarios": 328,
+          "total_interacciones": 80,
+          "sent_usuarios": "0.252",
+          "sent_interacciones": "0.291"
+        },
+        {
+          "rango_edad": "32-38",
+          "total_usuarios": 133,
+          "total_interacciones": 26,
+          "sent_usuarios": "0.268",
+          "sent_interacciones": "0.264"
+        },
+        {
+          "rango_edad": "39+",
+          "total_usuarios": 73,
+          "total_interacciones": 11,
+          "sent_usuarios": "0.250",
+          "sent_interacciones": "0.283"
+        }
+      ]
+    },
+    "Q7": {
+      "titulo": "Comparativa artistas vs no artistas",
+      "sql": "SELECT CASE WHEN es_artista = 1 THEN 'Artista' ELSE 'No artista' END AS perfil,\n                       COUNT(*)                               AS total_usuarios,\n                       ROUND(AVG(mensajes_30d), 1)           AS mensajes_30d_prom,\n                       ROUND(AVG(reacciones_30d), 1)         AS reacciones_30d_prom,\n                       ROUND(AVG(comisiones_compradas), 2)   AS comisiones_prom,\n                       ROUND(AVG(sentimiento_promedio), 3)   AS sentimiento_prom\n                FROM usuarios\n                WHERE es_artista IS NOT NULL\n                GROUP BY es_artista",
+      "filas": [
+        {
+          "perfil": "Artista",
+          "total_usuarios": 288,
+          "mensajes_30d_prom": "6.9",
+          "reacciones_30d_prom": "17.7",
+          "comisiones_prom": "1.46",
+          "sentimiento_prom": "0.251"
+        },
+        {
+          "perfil": "No artista",
+          "total_usuarios": 780,
+          "mensajes_30d_prom": "8.2",
+          "reacciones_30d_prom": "20.8",
+          "comisiones_prom": "0.41",
+          "sentimiento_prom": "0.257"
+        }
+      ]
+    },
+    "Q8": {
+      "titulo": "Etiquetas más frecuentes en interacciones",
+      "sql": "SELECT e.nombre AS etiqueta,\n                       COUNT(ie.id_interaccion) AS frecuencia\n                FROM etiquetas e\n                JOIN interaccion_etiqueta ie USING(id_etiqueta)\n                GROUP BY e.nombre\n                ORDER BY frecuencia DESC",
+      "filas": [
+        {
+          "etiqueta": "evento",
+          "frecuencia": 55
+        },
+        {
+          "etiqueta": "humor",
+          "frecuencia": 49
+        },
+        {
+          "etiqueta": "arte",
+          "frecuencia": 48
+        },
+        {
+          "etiqueta": "aviso",
+          "frecuencia": 47
+        },
+        {
+          "etiqueta": "juegos",
+          "frecuencia": 44
+        },
+        {
+          "etiqueta": "reglas",
+          "frecuencia": 38
+        },
+        {
+          "etiqueta": "musica",
+          "frecuencia": 37
+        }
+      ]
+    },
+    "Q9": {
+      "titulo": "Evolución semanal de interacciones y sentimiento",
+      "sql": "SELECT YEARWEEK(fecha_hora, 1)        AS semana,\n                       MIN(DATE(fecha_hora))          AS inicio_semana,\n                       COUNT(*)                       AS total_interacciones,\n                       ROUND(AVG(sentimiento), 3)     AS sentimiento_promedio\n                FROM interacciones\n                GROUP BY semana\n                ORDER BY semana",
+      "filas": [
+        {
+          "semana": 202641,
+          "inicio_semana": "2026-10-10T06:00:00.000Z",
+          "total_interacciones": 13,
+          "sentimiento_promedio": "0.138"
+        },
+        {
+          "semana": 202642,
+          "inicio_semana": "2026-10-12T06:00:00.000Z",
+          "total_interacciones": 46,
+          "sentimiento_promedio": "0.317"
+        },
+        {
+          "semana": 202643,
+          "inicio_semana": "2026-10-19T06:00:00.000Z",
+          "total_interacciones": 54,
+          "sentimiento_promedio": "0.329"
+        },
+        {
+          "semana": 202644,
+          "inicio_semana": "2026-10-26T06:00:00.000Z",
+          "total_interacciones": 47,
+          "sentimiento_promedio": "0.336"
+        },
+        {
+          "semana": 202645,
+          "inicio_semana": "2026-11-02T06:00:00.000Z",
+          "total_interacciones": 47,
+          "sentimiento_promedio": "0.254"
+        }
+      ]
+    },
+    "Q10": {
+      "titulo": "Usuarios en riesgo: perfil y última actividad",
+      "sql": "SELECT estatus,\n                       rango_edad,\n                       COUNT(*)                               AS total,\n                       ROUND(AVG(mensajes_30d), 1)           AS mensajes_30d_prom,\n                       ROUND(AVG(DATEDIFF(CURDATE(), ultima_actividad)), 0) AS dias_sin_actividad\n                FROM usuarios\n                WHERE estatus IN ('en_riesgo', 'inactivo')\n                GROUP BY estatus, rango_edad\n                ORDER BY estatus, dias_sin_actividad DESC",
+      "filas": [
+        {
+          "estatus": "en_riesgo",
+          "rango_edad": "25-31",
+          "total": 119,
+          "mensajes_30d_prom": "7.4",
+          "dias_sin_actividad": "47"
+        },
+        {
+          "estatus": "en_riesgo",
+          "rango_edad": "18-24",
+          "total": 224,
+          "mensajes_30d_prom": "6.5",
+          "dias_sin_actividad": "46"
+        },
+        {
+          "estatus": "en_riesgo",
+          "rango_edad": "32-38",
+          "total": 54,
+          "mensajes_30d_prom": "5.1",
+          "dias_sin_actividad": "45"
+        },
+        {
+          "estatus": "en_riesgo",
+          "rango_edad": "39+",
+          "total": 24,
+          "mensajes_30d_prom": "3.7",
+          "dias_sin_actividad": "43"
+        },
+        {
+          "estatus": "inactivo",
+          "rango_edad": "39+",
+          "total": 21,
+          "mensajes_30d_prom": "0.0",
+          "dias_sin_actividad": "227"
+        },
+        {
+          "estatus": "inactivo",
+          "rango_edad": "32-38",
+          "total": 29,
+          "mensajes_30d_prom": "0.0",
+          "dias_sin_actividad": "200"
+        },
+        {
+          "estatus": "inactivo",
+          "rango_edad": "25-31",
+          "total": 84,
+          "mensajes_30d_prom": "0.0",
+          "dias_sin_actividad": "187"
+        },
+        {
+          "estatus": "inactivo",
+          "rango_edad": "18-24",
+          "total": 123,
+          "mensajes_30d_prom": "0.0",
+          "dias_sin_actividad": "181"
+        }
+      ]
+    }
+  }
+}

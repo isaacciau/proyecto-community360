@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Community 360 — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root { --sb-ancho: 264px; --sb-mini: 84px; --top-alto: 72px; }
+
+    /* ═════════ PANEL LATERAL ═════════ */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
+      width: var(--sb-ancho); padding: 18px 14px;
+      display: flex; flex-direction: column;
+      background: rgba(13, 16, 36, .82); border-right: 1px solid var(--border);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      transition: width .35s cubic-bezier(.4,0,.2,1), transform .35s cubic-bezier(.4,0,.2,1);
+    }
+    @media (min-width: 901px) { .sidebar { animation: aparecerIzq .6s backwards; } }
+    .sb-cabeza { display: flex; align-items: center; gap: 12px; padding: 6px 8px 22px; white-space: nowrap; }
+    .sb-logo {
+      width: 42px; height: 42px; border-radius: 13px; flex: none; display: grid; place-items: center;
+      background: var(--grad); box-shadow: 0 8px 24px rgba(124,92,255,.45);
+      transition: transform .5s cubic-bezier(.2,1.4,.4,1);
+    }
+    .sb-cabeza:hover .sb-logo { transform: rotate(-12deg) scale(1.06); }
+    .sb-marca b { display: block; font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; }
+    .sb-marca span { font-size: .72rem; color: var(--muted); }
+
+    .sb-titulo {
+      font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+      color: #6a7099; padding: 8px 12px 10px; white-space: nowrap;
+    }
+    .nav { list-style: none; display: grid; gap: 4px; }
+    .nav button {
+      position: relative; width: 100%; display: flex; align-items: center; gap: 14px;
+      padding: 12px 14px; border: none; border-radius: 12px; cursor: pointer;
+      background: transparent; color: var(--muted); font-size: .9rem; font-weight: 600; text-align: left;
+      white-space: nowrap; overflow: hidden;
+      transition: background .25s, color .25s, transform .2s;
+      animation: aparecerIzq .45s both; animation-delay: calc(.15s + var(--i) * .06s);
+    }
+    .nav button svg { flex: none; transition: transform .3s cubic-bezier(.2,1.4,.4,1); }
+    .nav button:hover { background: rgba(255,255,255,.05); color: var(--text); }
+    .nav button:hover svg { transform: scale(1.15); }
+    .nav button.activo {
+      color: #fff; background: linear-gradient(90deg, rgba(124,92,255,.28), rgba(0,212,255,.08));
+      box-shadow: inset 0 0 0 1px rgba(124,92,255,.35);
+    }
+    .nav button.activo::before {
+      content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 3px;
+      border-radius: 0 4px 4px 0; background: var(--grad); animation: escala .3s both;
+    }
+    .nav .contador {
+      margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px;
+      display: none; place-items: center; font-size: .7rem; font-weight: 800;
+      background: var(--pink); color: #fff; animation: escala .3s both;
+    }
+    .nav .contador.visible { display: grid; }
+
+    .sb-pie { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+    .usuario {
+      display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 12px;
+      white-space: nowrap; overflow: hidden;
+    }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 12px; flex: none; display: grid; place-items: center;
+      background: var(--grad-warm); font-weight: 800; color: #fff; text-transform: uppercase;
+    }
+    .usuario .info b { display: block; font-size: .82rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+    .usuario .info span { font-size: .7rem; color: var(--green); }
+    .btn-salir {
+      margin-top: 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 11px; border-radius: 12px; cursor: pointer; white-space: nowrap; overflow: hidden;
+      background: rgba(255,92,138,.08); border: 1px solid rgba(255,92,138,.25); color: #ff8fae;
+      font-weight: 700; font-size: .85rem; transition: background .25s, transform .2s;
+    }
+    .btn-salir:hover { background: rgba(255,92,138,.18); transform: translateY(-1px); }
+    .btn-salir svg { flex: none; }
+
+    /* Panel lateral cerrado (solo íconos) */
+    body.sb-cerrado .sidebar { width: var(--sb-mini); }
+    body.sb-cerrado .sb-marca,
+    body.sb-cerrado .sb-titulo,
+    body.sb-cerrado .nav .txt,
+    body.sb-cerrado .nav .contador,
+    body.sb-cerrado .usuario .info,
+    body.sb-cerrado .btn-salir .txt { display: none; }
+    body.sb-cerrado .sb-cabeza { justify-content: center; padding-left: 0; padding-right: 0; }
+    body.sb-cerrado .nav .contador.visible { display: grid; position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; font-size: .6rem; }
+    body.sb-cerrado .nav button { justify-content: center; padding: 12px; }
+    body.sb-cerrado .usuario { justify-content: center; }
+    .sb-marca, .sb-titulo, .nav .txt, .usuario .info, .btn-salir .txt { transition: opacity .2s; }
+    body.sb-cerrado .nav button[data-tip]:hover::after {
+      content: attr(data-tip); position: fixed; left: calc(var(--sb-mini) + 6px);
+      padding: 7px 12px; border-radius: 8px; background: #1c2044; border: 1px solid var(--border);
+      color: #fff; font-size: .78rem; box-shadow: var(--shadow); animation: escala .2s both;
+    }
+
+    .velo { display: none; }
+
+    /* ═════════ CONTENIDO ═════════ */
+    .principal {
+      margin-left: var(--sb-ancho); min-height: 100vh;
+      transition: margin-left .35s cubic-bezier(.4,0,.2,1);
+    }
+    body.sb-cerrado .principal { margin-left: var(--sb-mini); }
+
+    .topbar {
+      position: sticky; top: 0; z-index: 30; height: var(--top-alto);
+      display: flex; align-items: center; gap: 16px; padding: 0 28px;
+      background: rgba(10,12,22,.65); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+      animation: aparecer .5s both;
+    }
+    .btn-icono {
+      width: 42px; height: 42px; flex: none; display: grid; place-items: center; cursor: pointer;
+      border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      transition: background .25s, transform .2s, border-color .25s;
+    }
+    .btn-icono:hover { background: var(--surface-2); border-color: rgba(124,92,255,.5); transform: translateY(-1px); }
+    .btn-icono:active { transform: scale(.94); }
+    .btn-icono.girando svg { animation: girar .8s linear infinite; }
+
+    /* Ícono hamburguesa que se transforma */
+    .hamb span { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; transition: transform .35s, opacity .25s, width .35s; }
+    .hamb span + span { margin-top: 4px; }
+    body.sb-cerrado .hamb span:nth-child(1) { width: 12px; transform: translateX(-3px); }
+    body.sb-cerrado .hamb span:nth-child(3) { width: 12px; transform: translateX(3px); }
+
+    .titulo-pag h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
+    .titulo-pag p { font-size: .78rem; color: var(--muted); }
+    .titulo-pag.cambio { animation: aparecer .4s both; }
+
+    .top-der { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .ws-badge {
+      display: flex; align-items: center; gap: 9px; padding: 8px 14px; border-radius: 999px;
+      font-size: .78rem; font-weight: 700; color: var(--muted);
+      background: var(--surface); border: 1px solid var(--border); transition: all .3s;
+    }
+    .ws-badge .dot { width: 9px; height: 9px; border-radius: 50%; background: #6a7099; transition: background .3s; }
+    .ws-badge.conectado { color: var(--green); border-color: rgba(46,230,166,.35); background: rgba(46,230,166,.08); }
+    .ws-badge.conectado .dot { background: var(--green); animation: pulso 1.6s infinite; }
+    .ws-badge.error { color: var(--pink); border-color: rgba(255,92,138,.35); }
+    .ws-badge.error .dot { background: var(--pink); }
+    .ultima { font-size: .74rem; color: var(--muted); white-space: nowrap; }
+
+    .contenido { padding: 28px; max-width: 1480px; margin: 0 auto; }
+
+    /* ═════════ KPIs ═════════ */
+    .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 22px; }
+    .kpi {
+      position: relative; overflow: hidden; padding: 18px 18px 16px; border-radius: var(--radius);
+      background: var(--surface); border: 1px solid var(--border);
+      transition: transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s, box-shadow .3s;
+      animation: aparecer .55s backwards; animation-delay: calc(.1s + var(--i) * .07s);
+    }
+    .kpi::before {
+      content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--c, var(--grad));
+    }
+    .kpi::after {
+      content: ''; position: absolute; width: 120px; height: 120px; border-radius: 50%;
+      right: -40px; top: -50px; background: var(--c, var(--primary)); opacity: .12; filter: blur(10px);
+      transition: transform .5s, opacity .5s;
+    }
+    .kpi:hover { transform: translateY(-5px); border-color: rgba(255,255,255,.18); box-shadow: var(--shadow); }
+    .kpi:hover::after { transform: scale(1.5); opacity: .22; }
+    .kpi-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .kpi-label { font-size: .68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; line-height: 1.3; }
+    .kpi-ic {
+      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+      background: rgba(255,255,255,.06); color: var(--ic, #a78bfa);
+    }
+    .kpi-value { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .kpi-sub { font-size: .74rem; color: var(--muted); margin-top: 8px; }
+    .kpi.updated { animation: destello 1.2s ease; }
+    @keyframes destello {
+      0% { box-shadow: 0 0 0 0 rgba(124,92,255,.0); }
+      25% { box-shadow: 0 0 0 3px rgba(124,92,255,.55), 0 0 40px rgba(124,92,255,.35); transform: translateY(-4px) scale(1.02); }
+      100% { box-shadow: 0 0 0 0 rgba(124,92,255,0); transform: none; }
+    }
+    .kpi.verde   { --c: var(--green);  --ic: var(--green); }
+    .kpi.naranja { --c: var(--orange); --ic: var(--orange); }
+    .kpi.rosa    { --c: var(--pink);   --ic: var(--pink); }
+    .kpi.azul    { --c: var(--primary-2); --ic: var(--primary-2); }
+    .kpi.morado  { --c: var(--primary); --ic: #a78bfa; }
+    .kpi.amarillo{ --c: var(--yellow); --ic: var(--yellow); }
+
+    /* ═════════ TARJETAS ═════════ */
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
+    .card {
+      position: relative; padding: 22px 22px 20px; border-radius: var(--radius);
+      background: var(--surface); border: 1px solid var(--border);
+      transition: transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s, box-shadow .3s;
+      min-width: 0;
+    }
+    .card:hover { transform: translateY(-3px); border-color: rgba(124,92,255,.35); box-shadow: var(--shadow); }
+    .card.entrar { animation: aparecer .55s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--i, 0) * .07s); }
+    .card.oculta { display: none; }
+    .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; }
+    .s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+
+    .card-cab { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+    .card-ic {
+      width: 38px; height: 38px; flex: none; border-radius: 11px; display: grid; place-items: center;
+      background: rgba(124,92,255,.14); color: #a78bfa;
+    }
+    .card h2 { font-size: 1rem; font-weight: 700; }
+    .card .sub { font-size: .78rem; color: var(--muted); }
+    .chip {
+      margin-left: auto; padding: 4px 10px; border-radius: 999px; font-size: .68rem; font-weight: 700;
+      background: rgba(0,212,255,.1); color: var(--primary-2); border: 1px solid rgba(0,212,255,.25); white-space: nowrap;
+    }
+    .chip.vivo { background: rgba(255,92,138,.1); color: #ff8fae; border-color: rgba(255,92,138,.3); }
+    .chip.vivo::before { content: '●'; margin-right: 5px; animation: parpadeo 1.2s infinite; }
+    @keyframes parpadeo { 50% { opacity: .2; } }
+
+    .canvas-wrap { position: relative; height: 270px; }
+    .canvas-wrap.alto { height: 320px; }
+
+    /* Tabla top usuarios */
+    table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    th {
+      text-align: left; font-size: .68rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .07em; padding: 0 10px 10px; border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+    tbody tr { transition: background .2s, transform .2s; }
+    tbody tr:hover { background: rgba(124,92,255,.08); }
+    tbody tr.entrar { animation: aparecer .4s both; animation-delay: calc(var(--i) * .05s); }
+    .rank {
+      width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+      font-size: .75rem; font-weight: 800; background: rgba(255,255,255,.06); color: var(--muted);
+    }
+    .rank.oro    { background: linear-gradient(135deg,#ffd76a,#ffb547); color: #3a2a00; }
+    .rank.plata  { background: linear-gradient(135deg,#e7ecff,#aab3d6); color: #20263f; }
+    .rank.bronce { background: linear-gradient(135deg,#ffb38a,#d9805a); color: #3a1a08; }
+    .alias { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+    .mini-av {
+      width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; flex: none;
+      font-size: .72rem; font-weight: 800; color: #fff; text-transform: uppercase;
+    }
+    .badge { padding: 3px 10px; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+    .badge.activo    { background: rgba(46,230,166,.12);  color: var(--activo); }
+    .badge.en_riesgo { background: rgba(255,181,71,.12);  color: var(--riesgo); }
+    .badge.inactivo  { background: rgba(255,92,138,.12);  color: var(--inactivo); }
+    .barra-sent { display: flex; align-items: center; gap: 8px; }
+    .barra-sent .pista { flex: 1; min-width: 50px; height: 6px; border-radius: 6px; background: rgba(255,255,255,.07); overflow: hidden; }
+    .barra-sent .relleno { height: 100%; border-radius: 6px; width: 0; transition: width 1s cubic-bezier(.2,.8,.2,1); }
+    .barra-sent b { font-size: .78rem; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+
+    /* Mapa de calor */
+    #heatmapGrid { display: grid; grid-template-columns: 44px repeat(24, 1fr); gap: 4px; }
+    .hm-header { font-size: .66rem; color: var(--muted); text-align: center; }
+    .hm-label { font-size: .72rem; color: var(--muted); font-weight: 600; display: flex; align-items: center; }
+    .hm-cell {
+      height: 26px; border-radius: 6px; cursor: pointer;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .hm-cell.pop { animation: escala .35s both; animation-delay: calc(var(--d) * 8ms); }
+    .hm-cell:hover { transform: scale(1.35); box-shadow: 0 0 0 2px #fff, 0 6px 18px rgba(0,0,0,.5); position: relative; z-index: 2; }
+    .hm-leyenda { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 14px; font-size: .7rem; color: var(--muted); }
+    .hm-leyenda .escala { width: 140px; height: 8px; border-radius: 8px; background: linear-gradient(90deg, rgba(124,92,255,.08), #7c5cff, #00d4ff); }
+    .tooltip-hm {
+      position: fixed; z-index: 60; pointer-events: none; padding: 8px 12px; border-radius: 10px;
+      background: #1c2044; border: 1px solid var(--border); font-size: .78rem; box-shadow: var(--shadow);
+      opacity: 0; transform: translateY(6px); transition: opacity .15s, transform .15s;
+    }
+    .tooltip-hm.visible { opacity: 1; transform: none; }
+
+    /* Bitácora de eventos en vivo */
+    #log-eventos { max-height: 320px; overflow-y: auto; display: grid; gap: 8px; padding-right: 4px; }
+    .log-vacio { display: grid; place-items: center; gap: 10px; padding: 36px 0; color: var(--muted); font-size: .85rem; text-align: center; }
+    .radar { width: 54px; height: 54px; border-radius: 50%; position: relative; background: rgba(124,92,255,.12); }
+    .radar::before, .radar::after {
+      content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(124,92,255,.6);
+      animation: onda 2s ease-out infinite;
+    }
+    .radar::after { animation-delay: 1s; }
+    @keyframes onda { from { transform: scale(.5); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+    .log-item {
+      display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px;
+      background: rgba(255,255,255,.035); border: 1px solid var(--border); font-size: .83rem;
+      animation: entraLog .45s cubic-bezier(.2,.8,.2,1) both;
+    }
+    @keyframes entraLog { from { opacity: 0; transform: translateX(-20px) scale(.98); background: rgba(124,92,255,.25); } to { opacity: 1; transform: none; } }
+    .log-ts { font-family: 'JetBrains Mono', monospace; font-size: .74rem; color: var(--muted); }
+    .log-ev { padding: 3px 10px; border-radius: 999px; font-size: .66rem; font-weight: 800; letter-spacing: .05em; }
+    .log-ev.nueva       { background: rgba(46,230,166,.14); color: var(--green); }
+    .log-ev.actualizada { background: rgba(255,181,71,.14); color: var(--orange); }
+    .log-ev.eliminada   { background: rgba(255,92,138,.14); color: var(--pink); }
+    .log-ev.stats       { background: rgba(0,212,255,.12);  color: var(--primary-2); }
+
+    /* Tabla de definiciones */
+    .def td:first-child { font-weight: 700; }
+    code {
+      font-family: 'JetBrains Mono', monospace; font-size: .78rem; padding: 3px 8px; border-radius: 7px;
+      background: rgba(124,92,255,.12); color: #c4b5fd; border: 1px solid rgba(124,92,255,.2); white-space: nowrap;
+    }
+
+    /* Notificaciones flotantes */
+    #notif-banner { position: fixed; bottom: 24px; right: 24px; z-index: 50; display: grid; gap: 10px; width: 340px; }
+    .notif {
+      position: relative; overflow: hidden; display: flex; gap: 12px; align-items: flex-start;
+      padding: 14px 16px; border-radius: 14px; background: rgba(22,26,56,.92); border: 1px solid var(--border);
+      box-shadow: var(--shadow); backdrop-filter: blur(12px);
+      animation: entraNotif .5s cubic-bezier(.2,1.2,.4,1) both;
+    }
+    .notif.sale { animation: saleNotif .35s ease both; }
+    @keyframes entraNotif { from { opacity: 0; transform: translateX(120%) scale(.9); } to { opacity: 1; transform: none; } }
+    @keyframes saleNotif  { to { opacity: 0; transform: translateX(120%); } }
+    .notif-icon { width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; }
+    .notif.nueva .notif-icon       { background: rgba(46,230,166,.15); color: var(--green); }
+    .notif.actualizada .notif-icon { background: rgba(255,181,71,.15); color: var(--orange); }
+    .notif.eliminada .notif-icon   { background: rgba(255,92,138,.15); color: var(--pink); }
+    .notif-body { font-size: .82rem; color: #cfd3f5; }
+    .notif-body strong { display: block; color: #fff; font-size: .86rem; margin-bottom: 2px; }
+    .notif .progreso { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; transform-origin: left; animation: progreso 5s linear both; }
+    .notif.nueva .progreso { background: var(--green); }
+    .notif.actualizada .progreso { background: var(--orange); }
+    .notif.eliminada .progreso { background: var(--pink); }
+    @keyframes progreso { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+    footer { text-align: center; color: #5f6590; font-size: .75rem; padding: 26px 0 30px; }
+
+    /* Cargando */
+    .cargando .kpi-value { color: transparent; background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.13), rgba(255,255,255,.05)); background-size: 200% 100%; border-radius: 8px; animation: degradado 1.4s infinite; }
+
+    /* ═════════ RESPONSIVO ═════════ */
+    @media (max-width: 1280px) {
+      .kpis { grid-template-columns: repeat(3, 1fr); }
+      .s4, .s5, .s7, .s8 { grid-column: span 6; }
+    }
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-105%); width: var(--sb-ancho) !important; box-shadow: var(--shadow); }
+      body.sb-movil .sidebar { transform: none; }
+      body.sb-cerrado .sb-marca, body.sb-cerrado .sb-titulo, body.sb-cerrado .nav .txt,
+      body.sb-cerrado .usuario .info, body.sb-cerrado .btn-salir .txt { display: block; }
+      body.sb-cerrado .sb-cabeza { justify-content: flex-start; padding: 6px 8px 22px; }
+      body.sb-cerrado .usuario { justify-content: flex-start; }
+      body.sb-cerrado .nav button { justify-content: flex-start; padding: 12px 14px; }
+      .principal, body.sb-cerrado .principal { margin-left: 0; }
+      .velo {
+        display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.5);
+        opacity: 0; pointer-events: none; transition: opacity .3s;
+      }
+      body.sb-movil .velo { opacity: 1; pointer-events: auto; }
+      .grid > .card { grid-column: span 12; }
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      .topbar { padding: 0 16px; }
+      .contenido { padding: 18px 14px; }
+      .ultima { display: none; }
+      #notif-banner { right: 12px; left: 12px; width: auto; }
+    }
+    @media (max-width: 560px) {
+      .ws-badge #wsLabel { display: none; }
+      .titulo-pag p { display: none; }
+      .kpi-value { font-size: 1.6rem; }
+      #heatmapGrid { grid-template-columns: 34px repeat(24, 1fr); gap: 2px; }
+      .hm-cell { border-radius: 3px; height: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-blobs"><span></span><span></span><span></span></div>
+<div class="bg-grid"></div>
+
+<!-- ═════════ PANEL LATERAL ═════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-cabeza">
+    <div class="sb-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20"/></svg>
+    </div>
+    <div class="sb-marca"><b>Community 360</b><span>Panel analítico</span></div>
+  </div>
+
+  <div class="sb-titulo">Menú</div>
+  <ul class="nav" id="nav">
+    <li><button data-vista="general" data-tip="Panel general" class="activo" style="--i:0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      <span class="txt">Panel general</span></button></li>
+    <li><button data-vista="usuarios" data-tip="Usuarios" style="--i:1">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="txt">Usuarios</span></button></li>
+    <li><button data-vista="interacciones" data-tip="Interacciones" style="--i:2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span class="txt">Interacciones</span></button></li>
+    <li><button data-vista="actividad" data-tip="Actividad" style="--i:3">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span class="txt">Actividad y horarios</span></button></li>
+    <li><button data-vista="ranking" data-tip="Top usuarios" style="--i:4">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+      <span class="txt">Top usuarios</span></button></li>
+    <li><button data-vista="envivo" data-tip="Tiempo real" style="--i:5">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      <span class="txt">Tiempo real</span><span class="contador" id="contadorVivo">0</span></button></li>
+    <li><button data-vista="indicadores" data-tip="Indicadores" style="--i:6">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+      <span class="txt">Indicadores</span></button></li>
+  </ul>
+
+  <div class="sb-pie">
+    <div class="usuario">
+      <div class="avatar" id="avatar">A</div>
+      <div class="info"><b id="userName">—</b><span>● Sesión activa</span></div>
+    </div>
+    <button class="btn-salir" id="btnLogout">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      <span class="txt">Cerrar sesión</span>
+    </button>
+  </div>
+</aside>
+<div class="velo" id="velo"></div>
+
+<!-- ═════════ CONTENIDO ═════════ -->
+<div class="principal">
+  <header class="topbar">
+    <button class="btn-icono hamb" id="btnMenu" aria-label="Abrir o cerrar el menú"><div><span></span><span></span><span></span></div></button>
+    <div class="titulo-pag" id="tituloPag">
+      <h1 id="tituloTxt">Panel general</h1>
+      <p id="subtituloTxt">Resumen completo de la comunidad</p>
+    </div>
+    <div class="top-der">
+      <span class="ultima" id="ultima">Cargando…</span>
+      <button class="btn-icono" id="btnRefrescar" aria-label="Actualizar datos" title="Actualizar datos">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.5 15"/></svg>
+      </button>
+      <span class="ws-badge" id="wsBadge"><span class="dot"></span><span id="wsLabel">Conectando…</span></span>
+    </div>
+  </header>
+
+  <div id="notif-banner"></div>
+
+  <main class="contenido">
+    <!-- KPIs -->
+    <section class="kpis cargando" id="kpis">
+      <div class="kpi verde" style="--i:0">
+        <div class="kpi-cab"><span class="kpi-label">Usuarios activos</span>
+          <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></span></div>
+        <div class="kpi-value" id="kpi-activo">—</div>
+        <div class="kpi-sub" id="kpi-activo-pct">— del total</div>
+      </div>
+      <div class="kpi naranja" style="--i:1">
+        <div class="kpi-cab"><span class="kpi-label">En riesgo</span>
+          <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
+        <div class="kpi-value" id="kpi-riesgo">—</div>
+        <div class="kpi-sub">Requieren atención</div>
+      </div>
+      <div class="kpi rosa" style="--i:2">
+        <div class="kpi-cab"><span class="kpi-label">Inactivos</span>
+          <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg></span></div>
+        <div class="kpi-value" id="kpi-inactivo">—</div>
+        <div class="kpi-sub">Sin actividad reciente</div>
+      </div>
+      <div class="kpi morado" style="--i:3">
+        <div class="kpi-cab"><span class="kpi-label">Interacciones</span>
+          <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span></div>
+        <div class="kpi-value" id="kpi-inter">—</div>
+        <div class="kpi-sub">Total en TiDB Cloud</div>
+      </div>
+      <div class="kpi azul" style="--i:4">
+        <div class="kpi-cab"><span class="kpi-label">Sentimiento prom.</span>
+          <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></span></div>
+        <div class="kpi-value" id="kpi-sent">—</div>
+        <div class="kpi-sub">Escala de −1 a +1</div>
+      </div>
+      <div class="kpi amarillo" style="--i:5">
+        <div class="kpi-cab"><span class="kpi-label">Reacciones prom.</span>
+          <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg></span></div>
+        <div class="kpi-value" id="kpi-reac">—</div>
+        <div class="kpi-sub">Por interacción</div>
+      </div>
+    </section>
+
+    <!-- Tarjetas (data-vistas indica en qué opciones del menú aparece cada una) -->
+    <section class="grid" id="grid">
+
+      <div class="card s4" data-vistas="general usuarios">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
+          <div><h2>Distribución de usuarios</h2><p class="sub">Por estatus de participación</p></div><span class="chip vivo">En vivo</span></div>
+        <div class="canvas-wrap"><canvas id="chartEstatus"></canvas></div>
+      </div>
+
+      <div class="card s8" data-vistas="general interacciones">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></span>
+          <div><h2>Interacciones por canal</h2><p class="sub">Volumen y sentimiento promedio</p></div><span class="chip vivo">En vivo</span></div>
+        <div class="canvas-wrap"><canvas id="chartCanal"></canvas></div>
+      </div>
+
+      <div class="card s6" data-vistas="general interacciones">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/></svg></span>
+          <div><h2>Temas más populares</h2><p class="sub">Top 10 temas de conversación</p></div><span class="chip">REST</span></div>
+        <div class="canvas-wrap"><canvas id="chartTema"></canvas></div>
+      </div>
+
+      <div class="card s6" data-vistas="general interacciones">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/></svg></span>
+          <div><h2>Etiquetas frecuentes</h2><p class="sub">Frecuencia de uso en interacciones</p></div><span class="chip vivo">En vivo</span></div>
+        <div class="canvas-wrap"><canvas id="chartEtiquetas"></canvas></div>
+      </div>
+
+      <div class="card s12" data-vistas="general actividad">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></span>
+          <div><h2>Evolución semanal de interacciones</h2><p class="sub">Volumen y sentimiento por semana</p></div><span class="chip">REST</span></div>
+        <div class="canvas-wrap alto"><canvas id="chartTemporal"></canvas></div>
+      </div>
+
+      <div class="card s5" data-vistas="general usuarios">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+          <div><h2>Usuarios por rango de edad</h2><p class="sub">Usuarios e interacciones</p></div><span class="chip">REST</span></div>
+        <div class="canvas-wrap"><canvas id="chartEdad"></canvas></div>
+      </div>
+
+      <div class="card s7" data-vistas="general usuarios ranking">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/></svg></span>
+          <div><h2>Top 10 usuarios más activos</h2><p class="sub">Por interacciones registradas</p></div><span class="chip">REST</span></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>#</th><th>Alias</th><th>Estatus</th><th>Interacc.</th><th>Sentimiento</th></tr></thead>
+            <tbody id="tablaTop"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card s12" data-vistas="general actividad">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+          <div><h2>Mapa de calor</h2><p class="sub">Interacciones por día de la semana y hora (UTC)</p></div><span class="chip">REST</span></div>
+        <div id="heatmapGrid"></div>
+        <div class="hm-leyenda">Menos <span class="escala"></span> Más</div>
+      </div>
+
+      <div class="card s12" data-vistas="general envivo">
+        <div class="card-cab"><span class="card-ic" style="background:rgba(255,92,138,.14);color:var(--pink)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+          <div><h2>Eventos en tiempo real (WebSocket)</h2><p class="sub">Los cambios enviados desde Postman aparecen aquí al instante</p></div><span class="chip vivo">Socket.io</span></div>
+        <div id="log-eventos">
+          <div class="log-vacio"><div class="radar"></div>En espera de eventos…</div>
+        </div>
+      </div>
+
+      <div class="card s12" data-vistas="general indicadores">
+        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
+          <div><h2>Definición matemática de indicadores</h2><p class="sub">Fórmulas aplicadas sobre la base de datos en tiempo real</p></div></div>
+        <div style="overflow-x:auto">
+          <table class="def">
+            <thead><tr><th>Indicador</th><th>Fórmula matemática</th><th>Interpretación</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Tasa de usuarios activos / en riesgo / inactivos</td>
+                <td><code>(N_estatus / N_total) × 100</code></td>
+                <td>Porcentaje del padrón según su estado de participación actual.</td>
+              </tr>
+              <tr>
+                <td>Total de interacciones</td>
+                <td><code>|I| = COUNT(id_interaccion)</code></td>
+                <td>Conteo exacto de interacciones válidas guardadas en la nube (se recalcula en altas, bajas y ediciones).</td>
+              </tr>
+              <tr>
+                <td>Sentimiento promedio</td>
+                <td><code>S̄ = (1 / |I|) × Σ sᵢ</code>, con <code>sᵢ ∈ [−1, 1]</code></td>
+                <td>Media aritmética de la polaridad de sentimiento de las interacciones registradas.</td>
+              </tr>
+              <tr>
+                <td>Reacciones promedio</td>
+                <td><code>R̄ = (1 / |I|) × Σ rᵢ</code></td>
+                <td>Promedio de reacciones recibidas por interacción.</td>
+              </tr>
+              <tr>
+                <td>Densidad del mapa de calor</td>
+                <td><code>H(d, h) = COUNT(i ∈ I : día(i) = d ∧ hora(i) = h)</code></td>
+                <td>Frecuencia de interacciones por día de la semana (0–6) y hora UTC (0–23).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<div class="tooltip-hm" id="tooltipHm"></div>
+
+<!-- ═════════════════════════════════════════════════════════
+     JavaScript del Dashboard
+     ═════════════════════════════════════════════════════════ -->
+<script>
+/* ── Auth ─────────────────────────────────────────────────── */
+const TOKEN = localStorage.getItem('c360_token')
+           || (document.cookie.split(';').find(c=>c.trim().startsWith('token='))||'=').split('=')[1];
+
+if (!TOKEN) { window.location.href = '/login'; }
+
+// Cabecera común para fetch
+const H = { 'Content-Type':'application/json', 'Authorization': `Bearer ${TOKEN}` };
+
+// Escapa texto antes de insertarlo como HTML
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+document.getElementById('btnLogout').addEventListener('click', async () => {
+  await fetch('/api/auth/logout', { method:'POST', credentials:'include' });
+  localStorage.removeItem('c360_token');
+  document.body.style.transition = 'opacity .35s'; document.body.style.opacity = '0';
+  setTimeout(() => { window.location.href = '/login'; }, 300);
+});
+
+/* ── Nombre de usuario ────────────────────────────────────── */
+fetch('/api/auth/me', { headers: H, credentials:'include' })
+  .then(r => {
+    if (r.status === 401) { localStorage.removeItem('c360_token'); window.location.href = '/login'; return null; }
+    return r.json();
+  })
+  .then(d => {
+    if (d && d.ok) {
+      const nombre = d.user.correo || d.user.rol;
+      document.getElementById('userName').textContent = nombre;
+      document.getElementById('avatar').textContent = String(nombre).charAt(0);
+    }
+  });
+
+/* ── Panel lateral: abrir / cerrar ────────────────────────── */
+const esMovil = () => window.matchMedia('(max-width: 900px)').matches;
+try { if (localStorage.getItem('c360_sb') === 'cerrado') document.body.classList.add('sb-cerrado'); } catch {}
+
+document.getElementById('btnMenu').addEventListener('click', () => {
+  if (esMovil()) { document.body.classList.toggle('sb-movil'); return; }
+  document.body.classList.toggle('sb-cerrado');
+  try { localStorage.setItem('c360_sb', document.body.classList.contains('sb-cerrado') ? 'cerrado' : 'abierto'); } catch {}
+});
+document.getElementById('velo').addEventListener('click', () => document.body.classList.remove('sb-movil'));
+
+/* ── Menú: elegir qué sección mostrar ─────────────────────── */
+const VISTAS = {
+  general      : ['Panel general',        'Resumen completo de la comunidad'],
+  usuarios     : ['Usuarios',             'Estatus, edades y participación del padrón'],
+  interacciones: ['Interacciones',        'Canales, temas y etiquetas'],
+  actividad    : ['Actividad y horarios', 'Evolución semanal y mapa de calor'],
+  ranking      : ['Top usuarios',         'Los miembros más participativos'],
+  envivo       : ['Tiempo real',          'Eventos recibidos por WebSocket'],
+  indicadores  : ['Indicadores',          'Definición matemática de cada métrica'],
+};
+let vistaActual = 'general';
+let pendientesVivo = 0;
+
+function cambiarVista(vista) {
+  vistaActual = vista;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('activo', b.dataset.vista === vista));
+
+  const titulo = document.getElementById('tituloPag');
+  document.getElementById('tituloTxt').textContent = VISTAS[vista][0];
+  document.getElementById('subtituloTxt').textContent = VISTAS[vista][1];
+  titulo.classList.remove('cambio'); void titulo.offsetWidth; titulo.classList.add('cambio');
+
+  let i = 0;
+  document.querySelectorAll('#grid .card').forEach(card => {
+    const visible = card.dataset.vistas.split(' ').includes(vista);
+    card.classList.toggle('oculta', !visible);
+    card.classList.remove('entrar');
+    if (visible) { card.style.setProperty('--i', i++); void card.offsetWidth; card.classList.add('entrar'); }
+  });
+
+  // Vuelve a animar las gráficas visibles
+  Object.values(charts).forEach(ch => {
+    if (ch.canvas.offsetParent !== null) { ch.reset(); ch.update(); }
+  });
+  if (vista === 'envivo' || vista === 'general') { pendientesVivo = 0; actualizarContador(); }
+  if (esMovil()) document.body.classList.remove('sb-movil');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('#nav button').forEach(b => b.addEventListener('click', () => cambiarVista(b.dataset.vista)));
+
+function actualizarContador() {
+  const c = document.getElementById('contadorVivo');
+  c.textContent = pendientesVivo;
+  c.classList.toggle('visible', pendientesVivo > 0);
+}
+
+/* ── Paleta y estilo de Chart.js ───────────────────────────── */
+const P = {
+  purple:'#7c5cff', pink:'#ff5c8a', green:'#2ee6a6', orange:'#ffb547',
+  blue:'#00d4ff', teal:'#38f4c8', yellow:'#ffe066', lila:'#a78bfa',
+  canales:['#7c5cff','#ff5c8a','#00d4ff','#ffb547','#2ee6a6','#ffe066'],
+};
+const alpha = (c,a) => c + Math.round(a*255).toString(16).padStart(2,'0');
+Chart.defaults.color = '#9097c0';
+Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+Chart.defaults.font.family = "'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif";
+Chart.defaults.maintainAspectRatio = false;
+Chart.defaults.animation.duration = 1100;
+Chart.defaults.animation.easing = 'easeOutQuart';
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.padding = 16;
+Object.assign(Chart.defaults.plugins.tooltip, {
+  backgroundColor:'#1c2044', borderColor:'rgba(255,255,255,.1)', borderWidth:1,
+  padding:12, cornerRadius:10, titleFont:{weight:'700'}, boxPadding:6,
+});
+const ctx = id => document.getElementById(id).getContext('2d');
+
+// Degradado vertical para rellenos de área
+function degradado(color) {
+  return (c) => {
+    const { chart } = c; const { ctx: g, chartArea } = chart;
+    if (!chartArea) return alpha(color, .2);
+    const gr = g.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    gr.addColorStop(0, alpha(color, .45)); gr.addColorStop(1, alpha(color, 0));
+    return gr;
+  };
+}
+
+/* ── Instancias de Chart.js (se crean vacías y se actualizan) ── */
+let charts = {};
+
+function crearGraficas() {
+  charts.estatus = new Chart(ctx('chartEstatus'), {
+    type:'doughnut',
+    data:{ labels:['En riesgo','Activo','Inactivo'],
+           datasets:[{data:[0,0,0], backgroundColor:[P.orange,P.green,P.pink],
+                      borderColor:'#12152c', borderWidth:4, hoverOffset:14, borderRadius:6}] },
+    options:{ cutout:'68%', animation:{ animateRotate:true, animateScale:true },
+              plugins:{ legend:{position:'bottom'} } }
+  });
+
+  charts.canal = new Chart(ctx('chartCanal'), {
+    type:'bar',
+    data:{ labels:[], datasets:[
+      { label:'Interacciones', data:[], backgroundColor:P.canales.map(c=>alpha(c,.8)),
+        hoverBackgroundColor:P.canales, borderRadius:10, borderSkipped:false, maxBarThickness:56, yAxisID:'y' },
+      { label:'Sentimiento', data:[], type:'line', borderColor:P.yellow, backgroundColor:P.yellow,
+        borderWidth:3, pointRadius:5, pointHoverRadius:8, pointBackgroundColor:'#12152c', pointBorderWidth:3, tension:.35, yAxisID:'y2' }
+    ]},
+    options:{ interaction:{mode:'index', intersect:false}, scales:{
+      x:{ grid:{display:false} },
+      y:{ title:{display:true,text:'Interacciones'}, beginAtZero:true },
+      y2:{ position:'right', min:-1, max:1, title:{display:true,text:'Sentimiento'}, grid:{drawOnChartArea:false} }
+    }, plugins:{legend:{position:'bottom'}} }
+  });
+
+  charts.tema = new Chart(ctx('chartTema'), {
+    type:'bar',
+    data:{ labels:[], datasets:[{label:'Interacciones', data:[],
+      backgroundColor:(c)=>{ const {chart}=c; const a=chart.chartArea; if(!a) return P.teal;
+        const g=chart.ctx.createLinearGradient(a.left,0,a.right,0); g.addColorStop(0,alpha(P.purple,.9)); g.addColorStop(1,alpha(P.blue,.9)); return g; },
+      borderRadius:8, borderSkipped:false, maxBarThickness:22}] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}},
+              scales:{ x:{title:{display:true,text:'Interacciones'}, beginAtZero:true}, y:{grid:{display:false}} } }
+  });
+
+  charts.etiquetas = new Chart(ctx('chartEtiquetas'), {
+    type:'polarArea',
+    data:{ labels:[], datasets:[{label:'Frecuencia', data:[],
+      backgroundColor:[P.purple,P.blue,P.green,P.orange,P.pink,P.teal,P.yellow].map(c=>alpha(c,.7)),
+      borderColor:'#12152c', borderWidth:2}] },
+    options:{ animation:{ animateRotate:true, animateScale:true },
+              scales:{ r:{ grid:{color:'rgba(255,255,255,.07)'}, angleLines:{color:'rgba(255,255,255,.07)'},
+                           ticks:{display:false} } },
+              plugins:{ legend:{position:'right'} } }
+  });
+
+  charts.temporal = new Chart(ctx('chartTemporal'), {
+    type:'line',
+    data:{ labels:[], datasets:[
+      { label:'Interacciones', data:[], borderColor:P.purple, backgroundColor:degradado(P.purple),
+        fill:true, tension:.42, borderWidth:3, pointRadius:4, pointHoverRadius:8,
+        pointBackgroundColor:'#12152c', pointBorderColor:P.purple, pointBorderWidth:2, yAxisID:'y' },
+      { label:'Sentimiento', data:[], borderColor:P.green, borderWidth:2, borderDash:[6,4],
+        pointRadius:3, pointBackgroundColor:P.green, tension:.35, yAxisID:'y2' }
+    ]},
+    options:{ interaction:{mode:'index', intersect:false}, scales:{
+      x:{ grid:{display:false} },
+      y:{ title:{display:true,text:'Interacciones'}, beginAtZero:true },
+      y2:{ position:'right', min:-1, max:1, title:{display:true,text:'Sentimiento'}, grid:{drawOnChartArea:false} }
+    }, plugins:{legend:{position:'bottom'}} }
+  });
+
+  charts.edad = new Chart(ctx('chartEdad'), {
+    type:'bar',
+    data:{ labels:[], datasets:[
+      { label:'Usuarios', data:[], backgroundColor:alpha(P.blue,.8), borderRadius:8, borderSkipped:false, yAxisID:'y' },
+      { label:'Interacciones', data:[], backgroundColor:alpha(P.lila,.8), borderRadius:8, borderSkipped:false, yAxisID:'y' }
+    ]},
+    options:{ interaction:{mode:'index', intersect:false}, plugins:{legend:{position:'bottom'}},
+              scales:{ x:{grid:{display:false}}, y:{title:{display:true,text:'Cantidad'}, beginAtZero:true} } }
+  });
+}
+
+function actualizarChart(chart, labels, datasets) {
+  chart.data.labels = labels;
+  datasets.forEach((d,i) => { chart.data.datasets[i].data = d; });
+  chart.update('active');
+}
+
+/* ── KPIs con conteo animado ──────────────────────────────── */
+function animarNumero(el, destino, decimales) {
+  const inicio = parseFloat(el.dataset.valor || '0') || 0;
+  const fin = Number(destino);
+  if (!isFinite(fin)) { el.textContent = destino ?? '—'; return; }
+  el.dataset.valor = fin;
+  const dur = 900, t0 = performance.now();
+  const paso = (t) => {
+    const p = Math.min((t - t0) / dur, 1);
+    const e = 1 - Math.pow(1 - p, 3);
+    const v = inicio + (fin - inicio) * e;
+    el.textContent = decimales ? v.toFixed(decimales) : Math.round(v).toLocaleString('es-MX');
+    if (p < 1) requestAnimationFrame(paso);
+  };
+  requestAnimationFrame(paso);
+}
+
+function actualizarKPIs(d) {
+  document.getElementById('kpis').classList.remove('cargando');
+  const set = (id, val, dec = 0) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cambio = el.dataset.valor !== undefined && Number(el.dataset.valor) !== Number(val);
+    animarNumero(el, val, dec);
+    if (cambio) {
+      const k = el.closest('.kpi');
+      k.classList.remove('updated'); void k.offsetWidth; k.classList.add('updated');
+    }
+  };
+  const total = d.total_usuarios || (d.activos + d.en_riesgo + d.inactivos);
+  set('kpi-activo',  d.activos);
+  set('kpi-riesgo',  d.en_riesgo);
+  set('kpi-inactivo',d.inactivos);
+  set('kpi-inter',   d.total_interacciones);
+  set('kpi-sent',    d.sentimiento_promedio, 3);
+  set('kpi-reac',    d.reacciones_promedio, 2);
+  if (total) document.getElementById('kpi-activo-pct').textContent =
+    `${((d.activos/total)*100).toFixed(1)}% del total`;
+
+  // Estatus donut
+  actualizarChart(charts.estatus, ['En riesgo','Activo','Inactivo'],
+    [[d.en_riesgo, d.activos, d.inactivos]]);
+
+  // Canal (si viene en stats)
+  if (d.por_canal) {
+    actualizarChart(charts.canal,
+      d.por_canal.map(r=>r.canal),
+      [d.por_canal.map(r=>r.total), d.por_canal.map(r=>+r.sentimiento_promedio)]
+    );
+  }
+  if (d.etiquetas) {
+    actualizarChart(charts.etiquetas,
+      d.etiquetas.map(r=>r.etiqueta),
+      [d.etiquetas.map(r=>r.frecuencia)]
+    );
+  }
+}
+
+/* ── Cargar datos históricos vía REST ─────────────────────── */
+async function cargarHistorico() {
+  const btn = document.getElementById('btnRefrescar');
+  btn.classList.add('girando');
+  const r = k => fetch(`/api/stats/${k}`, { headers: H, credentials:'include' }).then(r=>r.json());
+
+  try {
+    const [resumen, canal, tema, temporal, edad, etiquetas, topUsr, heatmap] = await Promise.all([
+      r('resumen'), r('por-canal'), r('por-tema'), r('temporal'),
+      r('por-edad'), r('etiquetas'), r('top-usuarios'), r('mapa-calor'),
+    ]);
+
+    if (resumen.ok) actualizarKPIs(resumen.data);
+
+    if (canal.ok) actualizarChart(charts.canal,
+      canal.data.map(r=>r.canal),
+      [canal.data.map(r=>r.total), canal.data.map(r=>+r.sentimiento_promedio)]
+    );
+
+    if (tema.ok) actualizarChart(charts.tema,
+      tema.data.map(r=>r.tema),
+      [tema.data.map(r=>r.total)]
+    );
+
+    if (etiquetas.ok) actualizarChart(charts.etiquetas,
+      etiquetas.data.map(r=>r.etiqueta),
+      [etiquetas.data.map(r=>r.frecuencia)]
+    );
+
+    if (temporal.ok) actualizarChart(charts.temporal,
+      temporal.data.map(r=>`Sem ${String(r.semana).slice(-2)}`),
+      [temporal.data.map(r=>r.total), temporal.data.map(r=>+r.sentimiento_promedio)]
+    );
+
+    if (edad.ok) actualizarChart(charts.edad,
+      edad.data.map(r=>r.rango_edad),
+      [edad.data.map(r=>r.total_usuarios), edad.data.map(r=>r.total_interacciones)]
+    );
+
+    if (topUsr.ok) renderTop(topUsr.data);
+    if (heatmap.ok) renderHeatmap(heatmap.data);
+
+    document.getElementById('ultima').textContent =
+      `Actualizado ${new Date().toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+  } catch (e) {
+    document.getElementById('ultima').textContent = 'Error al cargar datos';
+  } finally {
+    setTimeout(() => btn.classList.remove('girando'), 400);
+  }
+}
+document.getElementById('btnRefrescar').addEventListener('click', cargarHistorico);
+
+/* ── Top 10 usuarios ──────────────────────────────────────── */
+const COLORES_AV = ['#7c5cff','#00d4ff','#ff5c8a','#ffb547','#2ee6a6','#a78bfa'];
+function renderTop(lista) {
+  const tb = document.getElementById('tablaTop');
+  tb.innerHTML = lista.map((u,i) => {
+    const s = +u.sentimiento_promedio;
+    const color = s >= 0.3 ? 'var(--activo)' : s < 0 ? 'var(--inactivo)' : 'var(--riesgo)';
+    const ancho = Math.round(((s + 1) / 2) * 100);
+    const rank = i===0 ? 'oro' : i===1 ? 'plata' : i===2 ? 'bronce' : '';
+    return `
+      <tr class="entrar" style="--i:${i}">
+        <td><span class="rank ${rank}">${i+1}</span></td>
+        <td><span class="alias"><span class="mini-av" style="background:${COLORES_AV[i % COLORES_AV.length]}">${esc(String(u.alias).charAt(0))}</span>${esc(u.alias)}</span></td>
+        <td><span class="badge ${esc(u.estatus)}">${esc(String(u.estatus).replace('_',' '))}</span></td>
+        <td><b>${esc(u.total_interacciones)}</b></td>
+        <td><div class="barra-sent"><div class="pista"><div class="relleno" data-ancho="${ancho}" style="background:${color}"></div></div><b style="color:${color}">${s.toFixed(3)}</b></div></td>
+      </tr>`;
+  }).join('');
+  requestAnimationFrame(() => requestAnimationFrame(() =>
+    tb.querySelectorAll('.relleno').forEach(el => { el.style.width = el.dataset.ancho + '%'; })));
+}
+
+/* ── Mapa de calor ────────────────────────────────────────── */
+let heatmapAnimado = false;
+const tooltipHm = document.getElementById('tooltipHm');
+
+function renderHeatmap(datos) {
+  const grid = document.getElementById('heatmapGrid');
+  if (!grid) return;
+  const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const mapa = {};
+  let maxVal = 0;
+  datos.forEach(d => {
+    const k = `${d.dia_semana}_${d.hora}`;
+    mapa[k] = Number(d.total);
+    if (Number(d.total) > maxVal) maxVal = Number(d.total);
+  });
+
+  grid.innerHTML = '';
+  grid.appendChild(Object.assign(document.createElement('div'), {className:'hm-header'}));
+  for (let h=0; h<24; h++) {
+    grid.appendChild(Object.assign(document.createElement('div'), {className:'hm-header', textContent: h%3===0 ? h : ''}));
+  }
+  for (let d=0; d<7; d++) {
+    grid.appendChild(Object.assign(document.createElement('div'), {className:'hm-label', textContent: dias[d]}));
+    for (let h=0; h<24; h++) {
+      const val = mapa[`${d}_${h}`] || 0;
+      const pct = maxVal ? val/maxVal : 0;
+      const cell = document.createElement('div');
+      cell.className = 'hm-cell' + (heatmapAnimado ? '' : ' pop');
+      cell.style.setProperty('--d', d*24 + h);
+      cell.style.background = pct === 0
+        ? 'rgba(255,255,255,.04)'
+        : `color-mix(in srgb, #00d4ff ${Math.round(pct*100)}%, rgba(124,92,255,${0.25 + pct*0.6}))`;
+      cell.dataset.info = `<b>${dias[d]} · ${String(h).padStart(2,'0')}:00 UTC</b><br>${val} interacciones`;
+      grid.appendChild(cell);
+    }
+  }
+  heatmapAnimado = true;
+}
+document.getElementById('heatmapGrid').addEventListener('mousemove', e => {
+  const c = e.target.closest('.hm-cell');
+  if (!c) { tooltipHm.classList.remove('visible'); return; }
+  tooltipHm.innerHTML = c.dataset.info;
+  tooltipHm.style.left = (e.clientX + 14) + 'px';
+  tooltipHm.style.top  = (e.clientY + 14) + 'px';
+  tooltipHm.classList.add('visible');
+});
+document.getElementById('heatmapGrid').addEventListener('mouseleave', () => tooltipHm.classList.remove('visible'));
+
+/* ── Notificaciones ───────────────────────────────────────── */
+const ICONOS = {
+  nueva      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  actualizada: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  eliminada  : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+};
+const TITULOS = { nueva:'Nueva interacción', actualizada:'Interacción actualizada', eliminada:'Interacción eliminada' };
+
+function mostrarNotif(tipo, mensaje) {
+  const banner = document.getElementById('notif-banner');
+  const div = document.createElement('div');
+  div.className = `notif ${tipo}`;
+  div.innerHTML = `
+    <span class="notif-icon">${ICONOS[tipo]}</span>
+    <div class="notif-body"><strong>${TITULOS[tipo]}</strong>${esc(mensaje)}</div>
+    <span class="progreso"></span>`;
+  banner.prepend(div);
+  setTimeout(() => { div.classList.add('sale'); setTimeout(() => div.remove(), 350); }, 5000);
+}
+
+function agregarLog(tipo, texto) {
+  const log = document.getElementById('log-eventos');
+  const vacio = log.querySelector('.log-vacio');
+  if (vacio) vacio.remove();
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  const etiqueta = tipo === 'stats' ? 'KPIs' : tipo.toUpperCase();
+  item.innerHTML = `<span class="log-ts">${new Date().toLocaleTimeString('es-MX')}</span>
+    <span class="log-ev ${tipo}">${etiqueta}</span>
+    <span>${esc(texto)}</span>`;
+  log.prepend(item);
+  if (log.children.length > 50) log.lastElementChild.remove();
+
+  if (vistaActual !== 'envivo' && vistaActual !== 'general' && tipo !== 'stats') {
+    pendientesVivo++; actualizarContador();
+  }
+}
+
+/* ── WebSocket ────────────────────────────────────────────── */
+function conectarWS() {
+  const socket = io({ auth: { token: TOKEN } });
+  const badge  = document.getElementById('wsBadge');
+  const label  = document.getElementById('wsLabel');
+
+  socket.on('connect', () => {
+    badge.classList.add('conectado'); badge.classList.remove('error');
+    label.textContent = 'Tiempo real: ON';
+  });
+  socket.on('disconnect', () => {
+    badge.classList.remove('conectado');
+    label.textContent = 'Desconectado';
+  });
+  socket.on('connect_error', () => {
+    badge.classList.remove('conectado'); badge.classList.add('error');
+    label.textContent = 'Error de conexión';
+  });
+
+  // Eventos de interacciones
+  socket.on('interaccion:nueva', (data) => {
+    const i = data.interaccion || {};
+    mostrarNotif('nueva', `${i.id_interaccion || ''} · ${i.canal || ''} · ${i.tipo || ''}`);
+    agregarLog('nueva', `ID: ${i.id_interaccion} | Canal: ${i.canal} | Tipo: ${i.tipo}`);
+  });
+  socket.on('interaccion:actualizada', (data) => {
+    const i = data.interaccion || {};
+    mostrarNotif('actualizada', `${i.id_interaccion || ''} fue modificada`);
+    agregarLog('actualizada', `ID: ${i.id_interaccion} | Sentimiento: ${i.sentimiento}`);
+  });
+  socket.on('interaccion:eliminada', (data) => {
+    mostrarNotif('eliminada', `${data.id_interaccion} fue eliminada`);
+    agregarLog('eliminada', `ID: ${data.id_interaccion}`);
+  });
+
+  // Actualización de stats en tiempo real
+  socket.on('stats:actualizadas', (stats) => {
+    actualizarKPIs(stats);
+    cargarHistorico(); // Sincroniza también temas, temporal, edad, top usuarios y mapa de calor
+    agregarLog('stats', `KPIs y gráficas actualizados (${stats.total_interacciones} interacciones)`);
+  });
+}
+
+/* ── INICIO ───────────────────────────────────────────────── */
+crearGraficas();
+cargarHistorico();
+conectarWS();
+</script>
+</body>
+</html>
