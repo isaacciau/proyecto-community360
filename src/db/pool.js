@@ -17,6 +17,28 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit   : 10,
     queueLimit        : 0,
+    // Conexión estable con la nube: más tiempo para conectar, conexiones vivas
+    // y se cierran las que llevan mucho tiempo sin usarse (el gateway las corta).
+    connectTimeout       : 20000,
+    enableKeepAlive      : true,
+    keepAliveInitialDelay: 10000,
+    maxIdle              : 5,
+    idleTimeout          : 60000,
 });
+
+// Si la conexión no se pudo ABRIR (tiempo agotado o rechazada), se intenta una vez más.
+// Solo se reintenta cuando la consulta nunca llegó a la base, así no se duplica un INSERT.
+const ERRORES_DE_CONEXION = ['ETIMEDOUT', 'ECONNREFUSED', 'EAI_AGAIN', 'ENOTFOUND'];
+const consultaOriginal = pool.query.bind(pool);
+pool.query = async (...args) => {
+    try {
+        return await consultaOriginal(...args);
+    } catch (e) {
+        if (!ERRORES_DE_CONEXION.includes(e.code)) throw e;
+        console.warn(`[db] ${e.code} al conectar con TiDB, reintentando…`);
+        await new Promise(r => setTimeout(r, 500));
+        return consultaOriginal(...args);
+    }
+};
 
 module.exports = pool;
