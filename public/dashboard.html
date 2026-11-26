@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/img/logo.svg"/>
   <link rel="stylesheet" href="/css/style.css"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
@@ -25,10 +26,13 @@
     @media (min-width: 901px) { .sidebar { animation: aparecerIzq .6s backwards; } }
     .sb-cabeza { display: flex; align-items: center; gap: 12px; padding: 6px 8px 22px; white-space: nowrap; }
     .sb-logo {
-      width: 42px; height: 42px; border-radius: 13px; flex: none; display: grid; place-items: center;
-      background: var(--grad); box-shadow: 0 8px 24px rgba(124,92,255,.45);
+      width: 46px; height: 46px; border-radius: 14px; flex: none;
+      box-shadow: 0 8px 24px rgba(124,92,255,.5);
       transition: transform .5s cubic-bezier(.2,1.4,.4,1);
+      animation: logoEntra .9s .1s cubic-bezier(.2,1.4,.4,1) backwards;
     }
+    .sb-logo img { width: 100%; height: 100%; display: block; }
+    @keyframes logoEntra { from { opacity: 0; transform: scale(.3) rotate(-90deg); } to { opacity: 1; transform: none; } }
     .sb-cabeza:hover .sb-logo { transform: rotate(-12deg) scale(1.06); }
     .sb-marca b { display: block; font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; }
     .sb-marca span { font-size: .72rem; color: var(--muted); }
@@ -155,6 +159,13 @@
 
     /* ═════════ KPIs ═════════ */
     .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 22px; }
+    .kpis.oculta { display: none; }
+    /* Acomodo de tarjetas en las secciones sin los 6 cuadros */
+    @media (min-width: 1281px) {
+      body[data-vista="usuarios"] #grid .card:has(#chartEdad) { grid-column: span 8; }
+      body[data-vista="usuarios"] #grid .card:has(#tablaTop) { grid-column: span 12; }
+      body[data-vista="interacciones"] #grid .card:has(#chartCanal) { grid-column: span 12; }
+    }
     .kpi {
       position: relative; overflow: hidden; padding: 18px 18px 16px; border-radius: var(--radius);
       background: var(--surface); border: 1px solid var(--border);
@@ -304,6 +315,154 @@
       background: rgba(124,92,255,.12); color: #c4b5fd; border: 1px solid rgba(124,92,255,.2); white-space: nowrap;
     }
 
+    /* Tarjetas KPI clicables */
+    .kpi[data-kpi] { cursor: pointer; }
+    .kpi[data-kpi]:focus-visible { outline: 2px solid var(--primary-2); outline-offset: 3px; }
+    .kpi .kpi-sub { transition: opacity .2s; }
+    .kpi .ver-mas {
+      position: absolute; left: 18px; bottom: 16px; font-size: .74rem; font-weight: 700; color: var(--ic, #a78bfa);
+      opacity: 0; transform: translateX(-8px); transition: opacity .25s, transform .25s; pointer-events: none;
+    }
+    .kpi:hover .kpi-sub, .kpi:focus-visible .kpi-sub { opacity: 0; }
+    .kpi:hover .ver-mas, .kpi:focus-visible .ver-mas { opacity: 1; transform: none; }
+    .kpi:active { transform: translateY(-2px) scale(.98); }
+
+    /* Ventana de detalle */
+    .modal-fondo {
+      position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px;
+      background: rgba(5,6,14,.62); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      opacity: 0; pointer-events: none; transition: opacity .3s;
+    }
+    .modal-fondo.abierto { opacity: 1; pointer-events: auto; }
+    .modal {
+      width: min(1040px, 100%); max-height: calc(100vh - 48px); display: flex; flex-direction: column;
+      border-radius: 24px; overflow: hidden; background: #12152d; border: 1px solid var(--border);
+      box-shadow: 0 40px 100px rgba(0,0,0,.6);
+      transform: translateY(30px) scale(.94); transition: transform .45s cubic-bezier(.2,1.2,.4,1);
+    }
+    .modal-fondo.abierto .modal { transform: none; }
+    .modal-cab {
+      position: relative; display: flex; align-items: center; gap: 16px; padding: 22px 26px;
+      background: linear-gradient(120deg, color-mix(in srgb, var(--mc) 28%, transparent), transparent 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-cab::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--mc); }
+    .modal-ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; flex: none;
+      color: var(--mc); background: color-mix(in srgb, var(--mc) 18%, transparent); }
+    .modal-cab h2 { font-size: 1.25rem; font-weight: 800; }
+    .modal-cab p { font-size: .82rem; color: var(--muted); }
+    .modal-cerrar { margin-left: auto; }
+    .modal-cuerpo { padding: 22px 26px 26px; overflow-y: auto; }
+    .m-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .m-dato {
+      padding: 14px 16px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      animation: aparecer .45s backwards; animation-delay: calc(.1s + var(--i) * .06s);
+    }
+    .m-dato span { display: block; font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .m-dato b { display: block; font-size: 1.45rem; font-weight: 800; margin-top: 4px; color: #fff; }
+    .m-dato:first-child b { color: var(--mc); }
+    .m-zona { display: grid; grid-template-columns: 290px 1fr; gap: 16px; }
+    .m-panel { padding: 16px; border-radius: 16px; background: rgba(255,255,255,.03); border: 1px solid var(--border); min-width: 0;
+      animation: aparecer .5s .25s backwards; }
+    .m-panel h3 { font-size: .86rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+    .m-panel h3 small { margin-left: auto; font-size: .72rem; color: var(--muted); font-weight: 600; }
+    .m-grafica { position: relative; height: 290px; }
+    .m-buscar {
+      width: 100%; padding: 10px 14px 10px 38px; margin-bottom: 10px; border-radius: 10px; outline: none;
+      background: rgba(255,255,255,.04) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239097c0' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") 12px 50% no-repeat;
+      border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: .85rem; transition: border-color .25s, box-shadow .25s;
+    }
+    .m-buscar:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,92,255,.18); }
+    .m-tabla { max-height: 330px; overflow: auto; }
+    .m-tabla table { font-size: .8rem; }
+    .m-tabla thead th { position: sticky; top: 0; background: #171a36; z-index: 1; padding-top: 6px; }
+    .m-tabla tbody tr { animation: aparecer .35s backwards; animation-delay: calc(var(--i) * .02s); }
+    .m-tabla td { padding: 8px 8px; white-space: nowrap; }
+    .m-tabla th { white-space: nowrap; }
+    .m-tabla .mono { font-family: 'JetBrains Mono', monospace; font-size: .74rem; color: var(--muted); }
+    .privado { font-size: .68rem; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--muted); }
+    .sep-lista td { padding: 12px 10px 6px; font-size: .7rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--mc); background: transparent !important; }
+    .texto-corto { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .m-cargando { display: grid; place-items: center; gap: 12px; padding: 70px 0; color: var(--muted); }
+    .m-cargando .spinner { display: block; width: 30px; height: 30px; border-width: 3px; border-color: rgba(255,255,255,.15); border-top-color: var(--mc); }
+    @media (max-width: 860px) {
+      .m-resumen { grid-template-columns: repeat(2, 1fr); }
+      .m-zona { grid-template-columns: 1fr; }
+      .modal-fondo { padding: 10px; }
+      .modal-cab, .modal-cuerpo { padding-left: 16px; padding-right: 16px; }
+    }
+
+    /* Historial de cambios */
+    .filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .filtro {
+      display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; cursor: pointer;
+      background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+      font-size: .78rem; font-weight: 700; transition: all .25s;
+    }
+    .filtro:hover { color: var(--text); border-color: rgba(124,92,255,.45); transform: translateY(-1px); }
+    .filtro.activo { color: #fff; background: linear-gradient(90deg, rgba(124,92,255,.35), rgba(0,212,255,.15)); border-color: rgba(124,92,255,.55); }
+    .pt { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .pt.crear { background: var(--green); } .pt.actualizar { background: var(--orange); } .pt.eliminar { background: var(--pink); }
+
+    .timeline { position: relative; display: grid; gap: 12px; max-height: 520px; overflow-y: auto; padding: 2px 6px 2px 0; }
+    .h-item {
+      position: relative; display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: start;
+      padding: 14px 16px; border-radius: 14px; background: rgba(255,255,255,.03); border: 1px solid var(--border);
+      transition: transform .25s, border-color .25s, background .25s;
+      animation: aparecer .45s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--i, 0) * .05s);
+    }
+    .h-item:hover { transform: translateX(4px); background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.16); }
+    .h-item.nuevo { animation: entraLog .6s cubic-bezier(.2,.8,.2,1) both; }
+    .h-item::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--c); }
+    .h-item.crear { --c: var(--green); } .h-item.actualizar { --c: var(--orange); } .h-item.eliminar { --c: var(--pink); }
+    .h-ic {
+      width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+      color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent);
+    }
+    .h-titulo { font-weight: 700; font-size: .92rem; }
+    .h-titulo .id { font-family: 'JetBrains Mono', monospace; font-size: .82rem; padding: 2px 8px; border-radius: 7px; background: rgba(255,255,255,.07); margin: 0 4px; }
+    .h-meta { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+    .h-cambios { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .h-cambio {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px;
+      font-size: .76rem; background: rgba(255,255,255,.05); border: 1px solid var(--border);
+    }
+    .h-cambio b { color: var(--muted); font-weight: 600; }
+    .h-cambio .antes { color: #ff8fae; text-decoration: line-through; text-decoration-color: rgba(255,143,174,.5); }
+    .h-cambio .despues { color: var(--green); font-weight: 700; }
+    .h-cambio .flecha { color: var(--muted); }
+    .h-tiempo { text-align: right; font-size: .76rem; color: var(--muted); white-space: nowrap; }
+    .h-tiempo b { display: block; color: var(--text); font-size: .8rem; font-weight: 700; }
+    @media (max-width: 560px) {
+      .h-item { grid-template-columns: 36px 1fr; }
+      .h-ic { width: 36px; height: 36px; }
+      .h-tiempo { grid-column: 2; text-align: left; }
+    }
+
+    /* Animación al cerrar sesión */
+    .salida {
+      position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+      background: rgba(10,12,22,.0); backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0);
+      opacity: 0; pointer-events: none; transition: opacity .4s, background .5s, backdrop-filter .5s;
+    }
+    .salida.visible { opacity: 1; pointer-events: auto; background: rgba(10,12,22,.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+    .salida-centro { display: grid; justify-items: center; gap: 16px; transform: scale(.8); opacity: 0; transition: transform .5s cubic-bezier(.2,1.4,.4,1) .1s, opacity .4s .1s; }
+    .salida.visible .salida-centro { transform: none; opacity: 1; }
+    .salida-logo { position: relative; width: 84px; height: 84px; }
+    .salida-logo img { width: 100%; height: 100%; border-radius: 24px; box-shadow: 0 20px 50px rgba(124,92,255,.5); animation: latido 1.1s ease-in-out infinite; }
+    .salida-logo::after {
+      content: ''; position: absolute; inset: -10px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.08); border-top-color: var(--primary-2); border-right-color: var(--primary);
+      animation: girar .9s linear infinite;
+    }
+    @keyframes latido { 50% { transform: scale(.92); } }
+    .salida-centro b { font-size: 1.15rem; }
+    .salida-centro span { font-size: .85rem; color: var(--muted); margin-top: -10px; }
+    body.cerrando .sidebar, body.cerrando .principal {
+      transition: transform .6s cubic-bezier(.6,0,.4,1), opacity .6s, filter .6s;
+      transform: scale(.96); opacity: .4; filter: blur(4px);
+    }
+
     /* Notificaciones flotantes */
     #notif-banner { position: fixed; bottom: 24px; right: 24px; z-index: 50; display: grid; gap: 10px; width: 340px; }
     .notif {
@@ -374,9 +533,7 @@
 <!-- ═════════ PANEL LATERAL ═════════ -->
 <aside class="sidebar" id="sidebar">
   <div class="sb-cabeza">
-    <div class="sb-logo">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20"/></svg>
-    </div>
+    <div class="sb-logo"><img src="/img/logo.svg" alt="Logo de Community 360"/></div>
     <div class="sb-marca"><b>Community 360</b><span>Panel analítico</span></div>
   </div>
 
@@ -394,15 +551,12 @@
     <li><button data-vista="actividad" data-tip="Actividad" style="--i:3">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       <span class="txt">Actividad y horarios</span></button></li>
-    <li><button data-vista="ranking" data-tip="Top usuarios" style="--i:4">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
-      <span class="txt">Top usuarios</span></button></li>
-    <li><button data-vista="envivo" data-tip="Tiempo real" style="--i:5">
+    <li><button data-vista="envivo" data-tip="Tiempo real" style="--i:4">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
       <span class="txt">Tiempo real</span><span class="contador" id="contadorVivo">0</span></button></li>
-    <li><button data-vista="indicadores" data-tip="Indicadores" style="--i:6">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
-      <span class="txt">Indicadores</span></button></li>
+    <li><button data-vista="historial" data-tip="Historial" style="--i:5">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+      <span class="txt">Historial</span><span class="contador" id="contadorHist">0</span></button></li>
   </ul>
 
   <div class="sb-pie">
@@ -440,37 +594,37 @@
   <main class="contenido">
     <!-- KPIs -->
     <section class="kpis cargando" id="kpis">
-      <div class="kpi verde" style="--i:0">
+      <div class="kpi verde" data-kpi="activo" role="button" tabindex="0" aria-label="Ver detalle de usuarios activos" style="--i:0">
         <div class="kpi-cab"><span class="kpi-label">Usuarios activos</span>
           <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></span></div>
         <div class="kpi-value" id="kpi-activo">—</div>
         <div class="kpi-sub" id="kpi-activo-pct">— del total</div>
       </div>
-      <div class="kpi naranja" style="--i:1">
+      <div class="kpi naranja" data-kpi="en_riesgo" role="button" tabindex="0" aria-label="Ver detalle de usuarios en riesgo" style="--i:1">
         <div class="kpi-cab"><span class="kpi-label">En riesgo</span>
           <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></span></div>
         <div class="kpi-value" id="kpi-riesgo">—</div>
         <div class="kpi-sub">Requieren atención</div>
       </div>
-      <div class="kpi rosa" style="--i:2">
+      <div class="kpi rosa" data-kpi="inactivo" role="button" tabindex="0" aria-label="Ver detalle de usuarios inactivos" style="--i:2">
         <div class="kpi-cab"><span class="kpi-label">Inactivos</span>
           <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg></span></div>
         <div class="kpi-value" id="kpi-inactivo">—</div>
         <div class="kpi-sub">Sin actividad reciente</div>
       </div>
-      <div class="kpi morado" style="--i:3">
+      <div class="kpi morado" data-kpi="interacciones" role="button" tabindex="0" aria-label="Ver detalle de interacciones" style="--i:3">
         <div class="kpi-cab"><span class="kpi-label">Interacciones</span>
           <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span></div>
         <div class="kpi-value" id="kpi-inter">—</div>
         <div class="kpi-sub">Total en TiDB Cloud</div>
       </div>
-      <div class="kpi azul" style="--i:4">
+      <div class="kpi azul" data-kpi="sentimiento" role="button" tabindex="0" aria-label="Ver detalle de sentimiento" style="--i:4">
         <div class="kpi-cab"><span class="kpi-label">Sentimiento prom.</span>
           <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></span></div>
         <div class="kpi-value" id="kpi-sent">—</div>
         <div class="kpi-sub">Escala de −1 a +1</div>
       </div>
-      <div class="kpi amarillo" style="--i:5">
+      <div class="kpi amarillo" data-kpi="reacciones" role="button" tabindex="0" aria-label="Ver detalle de reacciones" style="--i:5">
         <div class="kpi-cab"><span class="kpi-label">Reacciones prom.</span>
           <span class="kpi-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg></span></div>
         <div class="kpi-value" id="kpi-reac">—</div>
@@ -517,7 +671,7 @@
         <div class="canvas-wrap"><canvas id="chartEdad"></canvas></div>
       </div>
 
-      <div class="card s7" data-vistas="general usuarios ranking">
+      <div class="card s7" data-vistas="general usuarios">
         <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/></svg></span>
           <div><h2>Top 10 usuarios más activos</h2><p class="sub">Por interacciones registradas</p></div><span class="chip">REST</span></div>
         <div style="overflow-x:auto">
@@ -543,40 +697,18 @@
         </div>
       </div>
 
-      <div class="card s12" data-vistas="general indicadores">
-        <div class="card-cab"><span class="card-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
-          <div><h2>Definición matemática de indicadores</h2><p class="sub">Fórmulas aplicadas sobre la base de datos en tiempo real</p></div></div>
-        <div style="overflow-x:auto">
-          <table class="def">
-            <thead><tr><th>Indicador</th><th>Fórmula matemática</th><th>Interpretación</th></tr></thead>
-            <tbody>
-              <tr>
-                <td>Tasa de usuarios activos / en riesgo / inactivos</td>
-                <td><code>(N_estatus / N_total) × 100</code></td>
-                <td>Porcentaje del padrón según su estado de participación actual.</td>
-              </tr>
-              <tr>
-                <td>Total de interacciones</td>
-                <td><code>|I| = COUNT(id_interaccion)</code></td>
-                <td>Conteo exacto de interacciones válidas guardadas en la nube (se recalcula en altas, bajas y ediciones).</td>
-              </tr>
-              <tr>
-                <td>Sentimiento promedio</td>
-                <td><code>S̄ = (1 / |I|) × Σ sᵢ</code>, con <code>sᵢ ∈ [−1, 1]</code></td>
-                <td>Media aritmética de la polaridad de sentimiento de las interacciones registradas.</td>
-              </tr>
-              <tr>
-                <td>Reacciones promedio</td>
-                <td><code>R̄ = (1 / |I|) × Σ rᵢ</code></td>
-                <td>Promedio de reacciones recibidas por interacción.</td>
-              </tr>
-              <tr>
-                <td>Densidad del mapa de calor</td>
-                <td><code>H(d, h) = COUNT(i ∈ I : día(i) = d ∧ hora(i) = h)</code></td>
-                <td>Frecuencia de interacciones por día de la semana (0–6) y hora UTC (0–23).</td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="card s12" data-vistas="general historial">
+        <div class="card-cab"><span class="card-ic" style="background:rgba(0,212,255,.12);color:var(--primary-2)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span>
+          <div><h2>Historial de cambios</h2><p class="sub">Últimas interacciones creadas, editadas y eliminadas</p></div>
+          <span class="chip" id="histTotal">0 cambios</span></div>
+        <div class="filtros" id="histFiltros">
+          <button class="filtro activo" data-accion="">Todos</button>
+          <button class="filtro" data-accion="crear"><i class="pt crear"></i>Creadas</button>
+          <button class="filtro" data-accion="actualizar"><i class="pt actualizar"></i>Editadas</button>
+          <button class="filtro" data-accion="eliminar"><i class="pt eliminar"></i>Eliminadas</button>
+        </div>
+        <div class="timeline" id="historial">
+          <div class="log-vacio"><div class="radar"></div>Todavía no hay cambios registrados</div>
         </div>
       </div>
 
@@ -586,6 +718,29 @@
 </div>
 
 <div class="tooltip-hm" id="tooltipHm"></div>
+
+<!-- Animación al cerrar sesión -->
+<div class="salida" id="salida" aria-hidden="true">
+  <div class="salida-centro">
+    <div class="salida-logo"><img src="/img/logo.svg" alt=""/></div>
+    <b>Cerrando sesión…</b>
+    <span>Guardando todo y saliendo de forma segura</span>
+  </div>
+</div>
+
+<!-- Ventana de detalle de cada KPI -->
+<div class="modal-fondo" id="modalFondo" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <div class="modal-cab">
+      <span class="modal-ic" id="modalIc"></span>
+      <div><h2 id="modalTitulo">Detalle</h2><p id="modalSub"></p></div>
+      <button class="btn-icono modal-cerrar" id="modalCerrar" aria-label="Cerrar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-cuerpo" id="modalCuerpo"></div>
+  </div>
+</div>
 
 <!-- ═════════════════════════════════════════════════════════
      JavaScript del Dashboard
@@ -604,10 +759,13 @@ const H = { 'Content-Type':'application/json', 'Authorization': `Bearer ${TOKEN}
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 document.getElementById('btnLogout').addEventListener('click', async () => {
-  await fetch('/api/auth/logout', { method:'POST', credentials:'include' });
+  document.body.classList.add('cerrando');
+  document.getElementById('salida').classList.add('visible');
+  const inicio = Date.now();
+  try { await fetch('/api/auth/logout', { method:'POST', credentials:'include' }); } catch {}
   localStorage.removeItem('c360_token');
-  document.body.style.transition = 'opacity .35s'; document.body.style.opacity = '0';
-  setTimeout(() => { window.location.href = '/login'; }, 300);
+  // deja ver la animación al menos 1.2 s antes de ir al login
+  setTimeout(() => { window.location.href = '/login?salida=1'; }, Math.max(0, 1200 - (Date.now() - inicio)));
 });
 
 /* ── Nombre de usuario ────────────────────────────────────── */
@@ -641,9 +799,8 @@ const VISTAS = {
   usuarios     : ['Usuarios',             'Estatus, edades y participación del padrón'],
   interacciones: ['Interacciones',        'Canales, temas y etiquetas'],
   actividad    : ['Actividad y horarios', 'Evolución semanal y mapa de calor'],
-  ranking      : ['Top usuarios',         'Los miembros más participativos'],
   envivo       : ['Tiempo real',          'Eventos recibidos por WebSocket'],
-  indicadores  : ['Indicadores',          'Definición matemática de cada métrica'],
+  historial    : ['Historial',            'Lo último que se creó, editó y eliminó'],
 };
 let vistaActual = 'general';
 let pendientesVivo = 0;
@@ -656,6 +813,13 @@ function cambiarVista(vista) {
   document.getElementById('tituloTxt').textContent = VISTAS[vista][0];
   document.getElementById('subtituloTxt').textContent = VISTAS[vista][1];
   titulo.classList.remove('cambio'); void titulo.offsetWidth; titulo.classList.add('cambio');
+
+  document.body.dataset.vista = vista;
+  // Los 6 cuadros (KPIs) solo se muestran en el Panel general
+  const kpis = document.getElementById('kpis');
+  const mostrarKpis = vista === 'general';
+  kpis.classList.toggle('oculta', !mostrarKpis);
+  if (mostrarKpis) kpis.querySelectorAll('.kpi').forEach(k => { k.style.animation = 'none'; void k.offsetWidth; k.style.animation = ''; });
 
   let i = 0;
   document.querySelectorAll('#grid .card').forEach(card => {
@@ -670,6 +834,9 @@ function cambiarVista(vista) {
     if (ch.canvas.offsetParent !== null) { ch.reset(); ch.update(); }
   });
   if (vista === 'envivo' || vista === 'general') { pendientesVivo = 0; actualizarContador(); }
+  if (vista === 'historial' || vista === 'general') {
+    pendientesHist = 0; document.getElementById('contadorHist').classList.remove('visible');
+  }
   if (esMovil()) document.body.classList.remove('sb-movil');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -893,6 +1060,7 @@ async function cargarHistorico() {
     );
 
     if (topUsr.ok) renderTop(topUsr.data);
+    cargarHistorial();
     if (heatmap.ok) renderHeatmap(heatmap.data);
 
     document.getElementById('ultima').textContent =
@@ -975,6 +1143,225 @@ document.getElementById('heatmapGrid').addEventListener('mousemove', e => {
 });
 document.getElementById('heatmapGrid').addEventListener('mouseleave', () => tooltipHm.classList.remove('visible'));
 
+/* ── Detalle de cada tarjeta KPI ───────────────────────────── */
+const DETALLE = {
+  activo       : { titulo:'Usuarios activos',     sub:'Miembros que participan con regularidad', color:'#2ee6a6' },
+  en_riesgo    : { titulo:'Usuarios en riesgo',   sub:'Miembros cuya participación va bajando',  color:'#ffb547' },
+  inactivo     : { titulo:'Usuarios inactivos',   sub:'Miembros sin actividad reciente',         color:'#ff5c8a' },
+  interacciones: { titulo:'Interacciones',        sub:'Las 50 más recientes guardadas en la base', color:'#7c5cff' },
+  sentimiento  : { titulo:'Sentimiento',          sub:'Qué tan positivas o negativas son las interacciones', color:'#00d4ff' },
+  reacciones   : { titulo:'Reacciones',           sub:'Las interacciones que más reacciones recibieron', color:'#ffe066' },
+};
+const modalFondo = document.getElementById('modalFondo');
+let kpiAbierto = null;
+let chartDetalle = null;
+
+document.querySelectorAll('.kpi[data-kpi]').forEach(k => {
+  k.insertAdjacentHTML('beforeend', '<span class="ver-mas">Ver detalle →</span>');
+  k.addEventListener('click', () => abrirDetalle(k.dataset.kpi));
+  k.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirDetalle(k.dataset.kpi); } });
+});
+document.getElementById('modalCerrar').addEventListener('click', cerrarDetalle);
+modalFondo.addEventListener('click', e => { if (e.target === modalFondo) cerrarDetalle(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && kpiAbierto) cerrarDetalle(); });
+
+function abrirDetalle(kpi) {
+  const cfg = DETALLE[kpi]; if (!cfg) return;
+  kpiAbierto = kpi;
+  const modal = modalFondo.querySelector('.modal');
+  modal.style.setProperty('--mc', cfg.color);
+  document.getElementById('modalTitulo').textContent = cfg.titulo;
+  document.getElementById('modalSub').textContent = cfg.sub;
+  document.getElementById('modalIc').innerHTML = document.querySelector(`.kpi[data-kpi="${kpi}"] .kpi-ic`).innerHTML;
+  document.getElementById('modalCuerpo').innerHTML = '<div class="m-cargando"><span class="spinner"></span>Consultando la base de datos…</div>';
+  modalFondo.classList.add('abierto'); modalFondo.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  cargarDetalle(kpi);
+}
+function cerrarDetalle() {
+  kpiAbierto = null;
+  modalFondo.classList.remove('abierto'); modalFondo.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  setTimeout(() => { if (!kpiAbierto && chartDetalle) { chartDetalle.destroy(); chartDetalle = null; } }, 350);
+}
+
+async function cargarDetalle(kpi) {
+  try {
+    const r = await fetch(`/api/stats/detalle/${kpi}`, { headers: H, credentials:'include' }).then(r => r.json());
+    if (kpiAbierto !== kpi) return;
+    if (!r.ok) throw new Error(r.error);
+    renderDetalle(kpi, r.data);
+  } catch (e) {
+    document.getElementById('modalCuerpo').innerHTML = '<div class="m-cargando">No se pudo cargar el detalle</div>';
+  }
+}
+
+const fechaCorta = s => s ? String(s).slice(0, 10) : '—';
+const fmtSent = v => { const n = +v; const c = n > 0.2 ? 'var(--green)' : n < -0.2 ? 'var(--pink)' : 'var(--orange)'; return `<b style="color:${c}">${n.toFixed(2)}</b>`; };
+
+function filasDetalle(kpi, lista) {
+  if (['activo','en_riesgo','inactivo'].includes(kpi)) {
+    return { cab: ['Alias','Edad','Plataforma','Interés','Msj. 30 d','País','Últ. actividad'],
+      filas: lista.map(u => [ `<b>${esc(u.alias)}</b><div class="mono">${esc(u.id_usuario)}</div>`, esc(u.rango_edad),
+        esc(u.plataforma_principal), esc(u.interes_principal), `<b>${esc(u.mensajes_30d)}</b>`,
+        u.pais ? esc(u.pais) : '<span class="privado" title="Sin consentimiento de datos">Privado</span>',
+        `<span class="mono">${esc(fechaCorta(u.ultima_actividad))}</span>` ]) };
+  }
+  if (kpi === 'interacciones') {
+    return { cab: ['ID','Fecha (UTC)','Usuario','Canal','Tipo','Tema','Sentimiento'],
+      filas: lista.map(i => [ `<span class="mono">${esc(i.id_interaccion)}</span>`, `<span class="mono">${esc(String(i.fecha_hora).slice(0,16))}</span>`,
+        `<b>${esc(i.alias)}</b>`, esc(i.canal), esc(i.tipo), esc(i.tema), fmtSent(i.sentimiento) ]) };
+  }
+  if (kpi === 'sentimiento') {
+    const fila = i => [ `<span class="mono">${esc(i.id_interaccion)}</span>`, `<b>${esc(i.alias)}</b>`, esc(i.canal), esc(i.tema),
+      fmtSent(i.sentimiento), `<div class="texto-corto" title="${esc(i.texto || '')}">${esc(i.texto || 'Sin texto')}</div>` ];
+    return { cab: ['ID','Usuario','Canal','Tema','Sentimiento','Texto'],
+      separadores: { 0: 'Las 5 más positivas', 5: 'Las 5 más negativas' }, filas: lista.map(fila) };
+  }
+  return { cab: ['#','ID','Usuario','Canal','Tipo','Tema','Reacciones'],
+    filas: lista.map((i, n) => [ `<span class="rank ${n===0?'oro':n===1?'plata':n===2?'bronce':''}">${n+1}</span>`,
+      `<span class="mono">${esc(i.id_interaccion)}</span>`, `<b>${esc(i.alias)}</b>`, esc(i.canal), esc(i.tipo), esc(i.tema),
+      `<b style="color:var(--yellow)">${esc(i.reacciones_recibidas)}</b>` ]) };
+}
+
+function renderDetalle(kpi, d) {
+  const color = DETALLE[kpi].color;
+  const t = filasDetalle(kpi, d.lista);
+  const conBuscador = d.lista.length > 12;
+  const cuerpo = document.getElementById('modalCuerpo');
+  cuerpo.innerHTML = `
+    <div class="m-resumen">${d.resumen.map((r, i) => `<div class="m-dato" style="--i:${i}"><span>${esc(r.etiqueta)}</span><b>${esc(r.valor ?? '—')}</b></div>`).join('')}</div>
+    <div class="m-zona">
+      <div class="m-panel"><h3>${esc(d.grafica.titulo)}</h3><div class="m-grafica"><canvas id="chartDetalle"></canvas></div></div>
+      <div class="m-panel">
+        <h3>${kpi === 'interacciones' ? 'Más recientes' : kpi === 'reacciones' ? 'Top 10 con más reacciones' : kpi === 'sentimiento' ? 'Extremos de sentimiento' : 'Usuarios'}
+          <small id="mConteo">${d.lista.length} registros</small></h3>
+        ${conBuscador ? '<input class="m-buscar" id="mBuscar" type="search" placeholder="Buscar en la lista…" autocomplete="off"/>' : ''}
+        <div class="m-tabla"><table>
+          <thead><tr>${t.cab.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+          <tbody id="mFilas">${t.filas.map((f, i) =>
+            (t.separadores && t.separadores[i] ? `<tr class="sep-lista"><td colspan="${t.cab.length}">${t.separadores[i]}</td></tr>` : '') +
+            `<tr style="--i:${Math.min(i, 25)}">${f.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>`;
+
+  // Gráfica del detalle
+  if (chartDetalle) chartDetalle.destroy();
+  const ctxD = document.getElementById('chartDetalle').getContext('2d');
+  const paleta = kpi === 'sentimiento' ? ['#ff5c8a','#ff9a8a','#ffb547','#7fe3c0','#2ee6a6']
+               : [color, '#7c5cff', '#00d4ff', '#ff5c8a', '#ffb547', '#2ee6a6', '#a78bfa'];
+  const dona = d.grafica.tipo === 'doughnut';
+  chartDetalle = new Chart(ctxD, {
+    type: d.grafica.tipo,
+    data: { labels: d.grafica.etiquetas, datasets: [{ label: d.grafica.titulo, data: d.grafica.valores,
+      backgroundColor: dona || kpi === 'sentimiento' ? paleta : alpha(color, .8), hoverBackgroundColor: dona ? paleta : color,
+      borderColor: '#12152d', borderWidth: dona ? 4 : 0, borderRadius: dona ? 6 : 8, borderSkipped: false, maxBarThickness: 44 }] },
+    options: dona
+      ? { cutout: '62%', plugins: { legend: { position: 'bottom' } } }
+      : { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } },
+  });
+
+  // Buscador de la lista (solo filtra lo que ya se ve, no modifica datos)
+  const buscar = document.getElementById('mBuscar');
+  if (buscar) buscar.addEventListener('input', () => {
+    const q = buscar.value.trim().toLowerCase();
+    let visibles = 0;
+    document.querySelectorAll('#mFilas tr').forEach(tr => {
+      const ok = !q || tr.textContent.toLowerCase().includes(q);
+      tr.style.display = ok ? '' : 'none'; if (ok) visibles++;
+    });
+    document.getElementById('mConteo').textContent = `${visibles} de ${d.lista.length} registros`;
+  });
+}
+
+/* ── Historial de cambios ─────────────────────────────────── */
+let filtroHist = '';
+let idsVistos = null;          // para animar solo los cambios nuevos
+let pendientesHist = 0;
+const ETIQ_CAMPO = { canal:'Canal', tipo:'Tipo', tema:'Tema', sentimiento:'Sentimiento', dispositivo:'Dispositivo',
+  idioma:'Idioma', texto:'Texto', fecha_hora:'Fecha', reacciones_recibidas:'Reacciones', longitud_texto:'Longitud' };
+const ACCION = {
+  crear     : { txt:'creada',    ic: ICONOS_H('crear') },
+  actualizar: { txt:'editada',   ic: ICONOS_H('actualizar') },
+  eliminar  : { txt:'eliminada', ic: ICONOS_H('eliminar') },
+};
+function ICONOS_H(a) {
+  return {
+    crear     : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    actualizar: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+    eliminar  : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+  }[a];
+}
+const fechaUTC = s => new Date(String(s).replace(' ', 'T') + 'Z');
+function haceCuanto(fecha) {
+  const seg = Math.max(0, Math.round((Date.now() - fecha.getTime()) / 1000));
+  if (seg < 45) return 'hace un momento';
+  const min = Math.floor(seg / 60); if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60); if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24); return `hace ${d} día${d > 1 ? 's' : ''}`;
+}
+const corto = v => { const t = v === null || v === undefined || v === '' ? '—' : String(v); return t.length > 28 ? t.slice(0, 28) + '…' : t; };
+
+async function cargarHistorial() {
+  try {
+    const q = filtroHist ? `&accion=${filtroHist}` : '';
+    const r = await fetch(`/api/historial?limit=40${q}`, { headers: H, credentials:'include' }).then(r => r.json());
+    if (r.ok) renderHistorial(r.data);
+  } catch {}
+}
+
+function renderHistorial(lista) {
+  const cont = document.getElementById('historial');
+  document.getElementById('histTotal').textContent = `${lista.length} cambio${lista.length === 1 ? '' : 's'}`;
+  if (!lista.length) {
+    cont.innerHTML = '<div class="log-vacio"><div class="radar"></div>Todavía no hay cambios registrados</div>';
+    return;
+  }
+  const primeraVez = idsVistos === null;
+  const vistos = idsVistos || new Set();
+  cont.innerHTML = lista.map((h, i) => {
+    const a = ACCION[h.accion] || ACCION.crear;
+    const d = h.detalle || {};
+    const fecha = fechaUTC(h.fecha_cambio);
+    let cuerpo = '';
+    if (h.accion === 'actualizar') {
+      const campos = Object.keys(d);
+      cuerpo = campos.length
+        ? `<div class="h-cambios">${campos.map(c => `<span class="h-cambio"><b>${esc(ETIQ_CAMPO[c] || c)}</b>
+             <span class="antes">${esc(corto(d[c].antes))}</span><span class="flecha">→</span>
+             <span class="despues">${esc(corto(d[c].despues))}</span></span>`).join('')}</div>`
+        : '<div class="h-meta">Se envió la edición, pero ningún valor cambió</div>';
+    } else {
+      const partes = [d.canal, d.tipo, d.tema && `tema ${d.tema}`, d.sentimiento !== undefined && `sentimiento ${d.sentimiento}`].filter(Boolean);
+      cuerpo = `<div class="h-cambios">${partes.map(p => `<span class="h-cambio">${esc(p)}</span>`).join('')}</div>`;
+    }
+    const nuevo = !primeraVez && !vistos.has(h.id_cambio);
+    return `<div class="h-item ${h.accion}${nuevo ? ' nuevo' : ''}" style="--i:${primeraVez ? i : 0}">
+        <span class="h-ic">${a.ic}</span>
+        <div>
+          <div class="h-titulo">Interacción<span class="id">${esc(h.id_interaccion)}</span>${a.txt}</div>
+          <div class="h-meta">Usuario ${esc(h.id_usuario || '—')} · por ${esc(h.realizado_por)}</div>
+          ${cuerpo}
+        </div>
+        <div class="h-tiempo" title="${esc(fecha.toLocaleString('es-MX'))}"><b data-fecha="${fecha.getTime()}">${haceCuanto(fecha)}</b>${esc(fecha.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'}))}</div>
+      </div>`;
+  }).join('');
+  idsVistos = new Set([...vistos, ...lista.map(h => h.id_cambio)]);
+}
+
+document.querySelectorAll('#histFiltros .filtro').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#histFiltros .filtro').forEach(x => x.classList.toggle('activo', x === b));
+  filtroHist = b.dataset.accion;
+  idsVistos = null;            // vuelve a animar la lista al cambiar de filtro
+  cargarHistorial();
+}));
+
+// Refresca el "hace X min" cada 30 segundos
+setInterval(() => {
+  document.querySelectorAll('.h-tiempo b[data-fecha]').forEach(el => { el.textContent = haceCuanto(new Date(+el.dataset.fecha)); });
+}, 30000);
+
 /* ── Notificaciones ───────────────────────────────────────── */
 const ICONOS = {
   nueva      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -1010,6 +1397,11 @@ function agregarLog(tipo, texto) {
 
   if (vistaActual !== 'envivo' && vistaActual !== 'general' && tipo !== 'stats') {
     pendientesVivo++; actualizarContador();
+  }
+  if (vistaActual !== 'historial' && vistaActual !== 'general' && tipo !== 'stats') {
+    pendientesHist++;
+    const c = document.getElementById('contadorHist');
+    c.textContent = pendientesHist; c.classList.add('visible');
   }
 }
 
@@ -1052,6 +1444,7 @@ function conectarWS() {
   socket.on('stats:actualizadas', (stats) => {
     actualizarKPIs(stats);
     cargarHistorico(); // Sincroniza también temas, temporal, edad, top usuarios y mapa de calor
+    if (kpiAbierto && !document.getElementById('mBuscar')?.value) cargarDetalle(kpiAbierto);
     agregarLog('stats', `KPIs y gráficas actualizados (${stats.total_interacciones} interacciones)`);
   });
 }
@@ -1061,5 +1454,6 @@ crearGraficas();
 cargarHistorico();
 conectarWS();
 </script>
+<script src="/js/efectos.js"></script>
 </body>
 </html>

@@ -23,6 +23,10 @@
  *   GET  /api/stats/por-edad        → interacciones por rango de edad
  *   GET  /api/stats/etiquetas       → etiquetas más usadas
  *   GET  /api/stats/top-usuarios    → top 10 usuarios activos
+ *   GET  /api/stats/detalle/:kpi    → detalle de cada tarjeta KPI
+ *
+ * HISTORIAL
+ *   GET  /api/historial             → últimos cambios hechos con POST, PUT y DELETE
  */
 const router      = require('express').Router();
 const pool        = require('../db/pool');
@@ -31,6 +35,75 @@ const { emitirConStats } = require('../ws/handler');
 
 // Todas las rutas de la API requieren autenticación
 router.use(verifyToken);
+
+// ═══════════════════════════════════════════════════════════
+// HISTORIAL DE CAMBIOS
+// Cada POST, PUT y DELETE de interacciones deja un registro con
+// la acción, los datos afectados, quién lo hizo y cuándo (UTC).
+// ═══════════════════════════════════════════════════════════
+pool.query(`CREATE TABLE IF NOT EXISTS historial_cambios (
+    id_cambio      INT NOT NULL AUTO_INCREMENT,
+    accion         ENUM('crear','actualizar','eliminar') NOT NULL,
+    id_interaccion VARCHAR(10) NOT NULL,
+    id_usuario     VARCHAR(10) NULL,
+    detalle        JSON NULL,
+    realizado_por  VARCHAR(100) NOT NULL,
+    fecha_cambio   DATETIME NOT NULL,
+    PRIMARY KEY (id_cambio),
+    INDEX idx_hist_fecha (fecha_cambio),
+    INDEX idx_hist_inter (id_interaccion)
+)`).catch(e => console.error('[historial] No se pudo crear la tabla:', e.message));
+
+async function registrarHistorial(req, accion, id_interaccion, id_usuario, detalle) {
+    try {
+        await pool.query(
+            `INSERT INTO historial_cambios
+             (accion, id_interaccion, id_usuario, detalle, realizado_por, fecha_cambio)
+             VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())`,
+            [accion, id_interaccion, id_usuario || null, JSON.stringify(detalle || {}),
+             (req.user && req.user.correo) || 'desconocido']
+        );
+    } catch (e) {
+        // El historial nunca debe impedir que la operación principal responda
+        console.error('[historial]', e.message);
+    }
+}
+
+// Compara el registro antes y después de un PUT y devuelve solo lo que cambió
+function camposCambiados(antes, despues, campos) {
+    const cambios = {};
+    for (const c of campos) {
+        const a = antes[c] === undefined ? null : antes[c];
+        const d = despues[c] === undefined ? null : despues[c];
+        const iguales = (a !== null && d !== null && !isNaN(a) && !isNaN(d) && String(a).trim() !== '' && String(d).trim() !== '')
+            ? Number(a) === Number(d)
+            : String(a) === String(d);
+        if (!iguales) cambios[c] = { antes: a, despues: d };
+    }
+    return cambios;
+}
+
+/** GET /api/historial?limit=30&accion=crear|actualizar|eliminar */
+router.get('/historial', async (req, res) => {
+    try {
+        const limit = Math.min(toInt(req.query.limit, 30), 100);
+        const params = [];
+        let where = '';
+        if (['crear','actualizar','eliminar'].includes(req.query.accion)) {
+            where = 'WHERE accion = ?';
+            params.push(req.query.accion);
+        }
+        const [rows] = await pool.query(
+            `SELECT id_cambio, accion, id_interaccion, id_usuario, detalle, realizado_por, fecha_cambio
+             FROM historial_cambios ${where} ORDER BY id_cambio DESC LIMIT ?`, [...params, limit]);
+        rows.forEach(r => {
+            if (typeof r.detalle === 'string') { try { r.detalle = JSON.parse(r.detalle); } catch { r.detalle = {}; } }
+        });
+        return res.json({ ok: true, data: rows });
+    } catch (e) {
+        return res.status(500).json({ ok: false, error: e.message });
+    }
+});
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -202,6 +275,10 @@ router.post('/interacciones', async (req, res) => {
         );
 
         const [rows] = await pool.query('SELECT * FROM interacciones WHERE id_interaccion = ?', [String(b.id_interaccion).trim()]);
+        const n = rows[0];
+        await registrarHistorial(req, 'crear', n.id_interaccion, n.id_usuario, {
+            canal: n.canal, tipo: n.tipo, tema: n.tema, sentimiento: n.sentimiento, dispositivo: n.dispositivo,
+        });
         // Emitir evento WebSocket
         await emitirConStats(req.io, 'interaccion:nueva', { interaccion: rows[0] });
         return res.status(201).json({ ok: true, data: rows[0] });
@@ -266,14 +343,17 @@ router.put('/interacciones/:id', async (req, res) => {
     }
 
     try {
-        const [exist] = await pool.query('SELECT id_interaccion FROM interacciones WHERE id_interaccion = ?', [id]);
+        const [exist] = await pool.query('SELECT * FROM interacciones WHERE id_interaccion = ?', [id]);
         if (!exist.length) return res.status(404).json({ ok: false, error: 'Interacción no encontrada' });
+        const antes = exist[0];
 
         const setCols = Object.keys(updates).map(c => `${c} = ?`).join(', ');
         await pool.query(`UPDATE interacciones SET ${setCols} WHERE id_interaccion = ?`,
             [...Object.values(updates), id]);
 
         const [rows] = await pool.query('SELECT * FROM interacciones WHERE id_interaccion = ?', [id]);
+        await registrarHistorial(req, 'actualizar', id, rows[0].id_usuario,
+            camposCambiados(antes, rows[0], Object.keys(updates)));
         // Emitir evento WebSocket
         await emitirConStats(req.io, 'interaccion:actualizada', { interaccion: rows[0] });
         return res.json({ ok: true, data: rows[0] });
@@ -288,10 +368,14 @@ router.put('/interacciones/:id', async (req, res) => {
 router.delete('/interacciones/:id', async (req, res) => {
     const id = req.params.id;
     try {
-        const [exist] = await pool.query('SELECT id_interaccion FROM interacciones WHERE id_interaccion = ?', [id]);
+        const [exist] = await pool.query('SELECT * FROM interacciones WHERE id_interaccion = ?', [id]);
         if (!exist.length) return res.status(404).json({ ok: false, error: 'Interacción no encontrada' });
+        const borrada = exist[0];
 
         await pool.query('DELETE FROM interacciones WHERE id_interaccion = ?', [id]);
+        await registrarHistorial(req, 'eliminar', id, borrada.id_usuario, {
+            canal: borrada.canal, tipo: borrada.tipo, tema: borrada.tema, sentimiento: borrada.sentimiento,
+        });
         // Emitir evento WebSocket
         await emitirConStats(req.io, 'interaccion:eliminada', { id_interaccion: id });
         return res.json({ ok: true, message: `Interacción ${id} eliminada` });
@@ -326,6 +410,138 @@ router.get('/stats/resumen', async (req, res) => {
             reacciones_promedio : reacProm.v,
         }});
     } catch (e) {
+        return res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
+/**
+ * GET /api/stats/detalle/:kpi — detalle de cada tarjeta KPI del dashboard
+ * kpi: activo | en_riesgo | inactivo | interacciones | sentimiento | reacciones
+ * Devuelve { resumen: [{etiqueta, valor}], grafica: {titulo, tipo, etiquetas, valores}, lista: [...] }
+ */
+router.get('/stats/detalle/:kpi', async (req, res) => {
+    const kpi = req.params.kpi;
+    try {
+        // ── Usuarios por estatus ──
+        if (['activo', 'en_riesgo', 'inactivo'].includes(kpi)) {
+            const [[r]] = await pool.query(
+                `SELECT COUNT(*) AS total,
+                        ROUND(COUNT(*) * 100 / (SELECT COUNT(*) FROM usuarios), 1) AS porcentaje,
+                        ROUND(AVG(mensajes_30d), 1)        AS mensajes,
+                        ROUND(AVG(sentimiento_promedio), 3) AS sentimiento,
+                        SUM(es_artista)                     AS artistas
+                 FROM usuarios WHERE estatus = ?`, [kpi]);
+            const [graf] = await pool.query(
+                `SELECT plataforma_principal AS etiqueta, COUNT(*) AS valor
+                 FROM usuarios WHERE estatus = ?
+                 GROUP BY plataforma_principal ORDER BY valor DESC`, [kpi]);
+            const [lista] = await pool.query(
+                `SELECT id_usuario, alias, rango_edad, plataforma_principal, interes_principal,
+                        mensajes_30d, sentimiento_promedio, ultima_actividad, pais
+                 FROM usuarios WHERE estatus = ?
+                 ORDER BY mensajes_30d DESC, alias`, [kpi]);
+            return res.json({ ok: true, data: {
+                resumen: [
+                    { etiqueta: 'Usuarios',              valor: r.total },
+                    { etiqueta: '% del padrón',          valor: `${r.porcentaje}%` },
+                    { etiqueta: 'Mensajes prom. (30 d)', valor: r.mensajes },
+                    { etiqueta: 'Artistas',              valor: r.artistas },
+                ],
+                grafica: { titulo: 'Plataforma principal', tipo: 'bar',
+                           etiquetas: graf.map(g => g.etiqueta), valores: graf.map(g => g.valor) },
+                lista,
+            }});
+        }
+
+        // ── Interacciones ──
+        if (kpi === 'interacciones') {
+            const [[r]] = await pool.query(
+                `SELECT COUNT(*) AS total, COUNT(DISTINCT id_usuario) AS usuarios,
+                        COUNT(DISTINCT canal) AS canales, ROUND(AVG(longitud_texto), 0) AS longitud
+                 FROM interacciones`);
+            const [graf] = await pool.query(
+                `SELECT tipo AS etiqueta, COUNT(*) AS valor FROM interacciones
+                 GROUP BY tipo ORDER BY valor DESC`);
+            const [lista] = await pool.query(
+                `SELECT i.id_interaccion, i.fecha_hora, u.alias, i.canal, i.tipo, i.tema, i.sentimiento
+                 FROM interacciones i JOIN usuarios u USING (id_usuario)
+                 ORDER BY i.fecha_hora DESC LIMIT 50`);
+            return res.json({ ok: true, data: {
+                resumen: [
+                    { etiqueta: 'Interacciones',       valor: r.total },
+                    { etiqueta: 'Usuarios que participan', valor: r.usuarios },
+                    { etiqueta: 'Canales usados',      valor: r.canales },
+                    { etiqueta: 'Largo prom. del texto', valor: `${r.longitud || 0} car.` },
+                ],
+                grafica: { titulo: 'Interacciones por tipo', tipo: 'doughnut',
+                           etiquetas: graf.map(g => g.etiqueta), valores: graf.map(g => g.valor) },
+                lista,
+            }});
+        }
+
+        // ── Sentimiento ──
+        if (kpi === 'sentimiento') {
+            const [[r]] = await pool.query(
+                `SELECT ROUND(AVG(sentimiento), 3) AS promedio,
+                        SUM(sentimiento >  0.2) AS positivas,
+                        SUM(sentimiento BETWEEN -0.2 AND 0.2) AS neutras,
+                        SUM(sentimiento < -0.2) AS negativas
+                 FROM interacciones`);
+            const [graf] = await pool.query(
+                `SELECT CASE
+                          WHEN sentimiento < -0.6 THEN 1 WHEN sentimiento < -0.2 THEN 2
+                          WHEN sentimiento <= 0.2 THEN 3 WHEN sentimiento <= 0.6 THEN 4 ELSE 5 END AS rango,
+                        COUNT(*) AS valor
+                 FROM interacciones GROUP BY rango ORDER BY rango`);
+            const nombres = ['Muy negativo', 'Negativo', 'Neutral', 'Positivo', 'Muy positivo'];
+            const valores = nombres.map((_, i) => Number((graf.find(g => Number(g.rango) === i + 1) || {}).valor || 0));
+            const consulta = (orden) => pool.query(
+                `SELECT i.id_interaccion, u.alias, i.canal, i.tema, i.sentimiento, i.texto
+                 FROM interacciones i JOIN usuarios u USING (id_usuario)
+                 ORDER BY i.sentimiento ${orden}, i.id_interaccion LIMIT 5`);
+            const [[mejores], [peores]] = await Promise.all([consulta('DESC'), consulta('ASC')]);
+            return res.json({ ok: true, data: {
+                resumen: [
+                    { etiqueta: 'Promedio',             valor: r.promedio },
+                    { etiqueta: 'Positivas (> 0.2)',    valor: r.positivas },
+                    { etiqueta: 'Neutras',              valor: r.neutras },
+                    { etiqueta: 'Negativas (< −0.2)',   valor: r.negativas },
+                ],
+                grafica: { titulo: 'Distribución del sentimiento', tipo: 'bar', etiquetas: nombres, valores },
+                lista: [...mejores, ...peores],
+            }});
+        }
+
+        // ── Reacciones ──
+        if (kpi === 'reacciones') {
+            const [[r]] = await pool.query(
+                `SELECT ROUND(AVG(reacciones_recibidas), 2) AS promedio, MAX(reacciones_recibidas) AS maximo,
+                        SUM(reacciones_recibidas) AS total,
+                        ROUND(SUM(reacciones_recibidas = 0) * 100 / COUNT(*), 1) AS sin_reaccion
+                 FROM interacciones`);
+            const [graf] = await pool.query(
+                `SELECT canal AS etiqueta, ROUND(AVG(reacciones_recibidas), 2) AS valor
+                 FROM interacciones GROUP BY canal ORDER BY valor DESC`);
+            const [lista] = await pool.query(
+                `SELECT i.id_interaccion, u.alias, i.canal, i.tipo, i.tema, i.reacciones_recibidas
+                 FROM interacciones i JOIN usuarios u USING (id_usuario)
+                 ORDER BY i.reacciones_recibidas DESC, i.id_interaccion LIMIT 10`);
+            return res.json({ ok: true, data: {
+                resumen: [
+                    { etiqueta: 'Promedio',         valor: r.promedio },
+                    { etiqueta: 'Máximo',           valor: r.maximo },
+                    { etiqueta: 'Total recibidas',  valor: r.total },
+                    { etiqueta: 'Sin reacciones',   valor: `${r.sin_reaccion}%` },
+                ],
+                grafica: { titulo: 'Reacciones promedio por canal', tipo: 'bar',
+                           etiquetas: graf.map(g => g.etiqueta), valores: graf.map(g => Number(g.valor)) },
+                lista,
+            }});
+        }
+
+        return res.status(404).json({ ok: false, error: 'Indicador no encontrado' });
+    } catch (e) {
+        console.error('[GET /stats/detalle]', e.message);
         return res.status(500).json({ ok: false, error: e.message });
     }
 });

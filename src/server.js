@@ -61,6 +61,10 @@ app.get('/dashboard', verifyTokenPage, (_req, res) => {
 // Redirigir raíz a login
 app.get('/', (_req, res) => res.redirect('/login'));
 
+// Ruta ligera para comprobar que el servidor está encendido (sin tocar la base de datos).
+// La usa el monitor externo que evita que Render apague el servicio por inactividad.
+app.get('/salud', (_req, res) => res.json({ ok: true, servicio: 'community360', hora: new Date().toISOString() }));
+
 // 404 genérico
 app.use((_req, res) => res.status(404).json({ ok: false, error: 'Ruta no encontrada' }));
 

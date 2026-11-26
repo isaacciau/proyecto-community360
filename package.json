@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "etl": "node src/etl.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "crear-usuario": "node src/crear_usuario.js"
   },
   "keywords": [],
   "author": "",
@@ -21,5 +22,8 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.24.6",
     "socket.io": "^4.8.4"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

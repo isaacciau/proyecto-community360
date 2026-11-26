@@ -19,14 +19,21 @@ router.post('/login', async (req, res) => {
     const password = body.password;
 
     if (!correo || !password) {
-        return res.status(400).json({ ok: false, error: 'Campos requeridos: correo y password' });
+        return res.status(400).json({ ok: false, error: 'Campos requeridos: correo (o usuario) y password' });
     }
 
     try {
-        const [rows] = await pool.query(
-            'SELECT id_admin, correo, password_hash, rol, activo FROM admin_usuarios WHERE correo = ?',
-            [String(correo).trim()]
-        );
+        // Se puede entrar con el correo completo (lizandro.reyes@utmetropolitana.edu.mx)
+        // o solo con el usuario, que es la parte antes de la @ (lizandro.reyes)
+        const entrada = String(correo).trim().toLowerCase();
+        const [rows] = entrada.includes('@')
+            ? await pool.query(
+                'SELECT id_admin, correo, password_hash, rol, activo FROM admin_usuarios WHERE LOWER(correo) = ?',
+                [entrada])
+            : await pool.query(
+                `SELECT id_admin, correo, password_hash, rol, activo FROM admin_usuarios
+                 WHERE LOWER(SUBSTRING_INDEX(correo, '@', 1)) = ? LIMIT 1`,
+                [entrada]);
 
         if (rows.length === 0 || !rows[0].activo) {
             return res.status(401).json({ ok: false, error: 'Credenciales inválidas' });

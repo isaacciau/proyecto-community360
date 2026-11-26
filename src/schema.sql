@@ -1,6 +1,6 @@
 USE community360;
 
-DROP TABLE IF EXISTS interaccion_etiqueta, cuarentena_interacciones, interacciones,
+DROP TABLE IF EXISTS historial_cambios, interaccion_etiqueta, cuarentena_interacciones, interacciones,
   etiquetas, bitacora_etl, usuarios, admin_usuarios;
 
 CREATE TABLE usuarios (
@@ -106,6 +106,21 @@ CREATE TABLE admin_usuarios (
   fecha_creacion DATETIME NOT NULL,
   PRIMARY KEY (id_admin),
   UNIQUE KEY uq_admin_correo (correo)
+);
+
+-- Historial de cambios hechos desde la API (POST, PUT, DELETE).
+-- No tiene llave foránea a interacciones para conservar el registro de las eliminadas.
+CREATE TABLE historial_cambios (
+  id_cambio INT NOT NULL AUTO_INCREMENT,
+  accion ENUM('crear','actualizar','eliminar') NOT NULL,
+  id_interaccion VARCHAR(10) NOT NULL,
+  id_usuario VARCHAR(10) NULL,
+  detalle JSON NULL,
+  realizado_por VARCHAR(100) NOT NULL,
+  fecha_cambio DATETIME NOT NULL,
+  PRIMARY KEY (id_cambio),
+  INDEX idx_hist_fecha (fecha_cambio),
+  INDEX idx_hist_inter (id_interaccion)
 );
 
 SHOW TABLES;
